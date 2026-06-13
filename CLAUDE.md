@@ -92,10 +92,22 @@ See `backend/.env.example`. Key vars:
 | Phase | Days | Status |
 |---|---|---|
 | 1 — Foundation & Auth | 1–2 | ✅ Complete + QA passed |
-| 2 — Band Integration & Agent Core | 3–4 | Pending |
+| 2 — Band Integration & Agent Core | 3–4 | ✅ Complete |
 | 3 — Full Report UI + Diff Mode | 5–6 | Pending |
 | 4 — Performance, UX Polish & Unique Features | 7 | Pending |
 | 5 — Final Integration QA & Demo Prep | 8 | Pending |
+
+## Phase 2 — Band Integration & Agent Core
+- `band/client.py` — wraps `thenvoi_rest.AsyncRestClient`; `create_room` → `agent_api_chats.create_agent_chat`; `post_message` → `agent_api_events.create_agent_chat_event` (type=`tool_result`, payload in `metadata`); `get_room_messages` → `agent_api_context.get_agent_chat_context`
+- All 4 agents share a single Band API key; each reads prior events via `get_agent_chat_context(room_id)`
+- Agents post `tool_result` events; DEBATE posts an additional event with `output_type="DEBATE"` referencing the Architect message ID
+- `orchestrator/pipeline.py` — async, sequential Security→Architect→Onboarding→Mentor; publishes SSE events to Redis pub/sub channel `sse:{session_id}`
+- `orchestrator/tasks.py` — Celery task wraps pipeline with `asyncio.run()`; FastAPI falls back to `asyncio.create_task()` if Celery unavailable
+- `POST /analyze` validates GitHub URL, creates session doc, dispatches Celery task
+- `GET /analyze/stream/{session_id}` — SSE via `StreamingResponse` + Redis pub/sub
+- `GET /reports/{session_id}` — returns full report; `GET /reports/{session_id}/download` — ZIP with ADR.md, CONTRIBUTING.md, ISSUE_1-3.md
+- `GET /r/{share_token}` — public read-only (no auth)
+- `frontend/app/analyze/page.tsx` — 4 agent cards with shimmer animation + live Band Room Viewer panel via SSE
 
 ## Phase 1 QA Results (all 15 checks passed)
 - `GET /health` → `{status: ok}`

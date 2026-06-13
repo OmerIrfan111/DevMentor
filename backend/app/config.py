@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     aws_secret_access_key: str = ""
     aws_region: str = "us-east-1"
     github_token: str = ""
+    anthropic_api_key: str = ""
     cors_origins: str = "http://localhost:3000"
 
     @property
