@@ -1,7 +1,7 @@
 import httpx
 import re
 from abc import ABC, abstractmethod
-from anthropic import AsyncAnthropic
+from anthropic import AsyncAnthropicBedrock
 from app.band.client import BandClient
 from app.config import settings
 
@@ -89,11 +89,12 @@ async def fetch_repo_contents(repo_url: str, github_token: str | None = None) ->
         }
 
 
-def _llm_client() -> AsyncAnthropic:
-    api_key = settings.anthropic_api_key
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set")
-    return AsyncAnthropic(api_key=api_key)
+def _llm_client() -> AsyncAnthropicBedrock:
+    return AsyncAnthropicBedrock(
+        aws_access_key=settings.aws_access_key_id,
+        aws_secret_key=settings.aws_secret_access_key,
+        aws_region=settings.aws_region,
+    )
 
 
 class BaseAgent(ABC):
@@ -129,7 +130,7 @@ class BaseAgent(ABC):
 
     async def call_llm(self, system: str, user: str, max_tokens: int = 4096) -> str:
         response = await self._llm.messages.create(
-            model="claude-sonnet-4-6",
+            model=settings.bedrock_model_id,
             max_tokens=max_tokens,
             system=system,
             messages=[{"role": "user", "content": user}],

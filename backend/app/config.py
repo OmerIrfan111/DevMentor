@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     aws_secret_access_key: str = ""
     aws_region: str = "us-east-1"
     github_token: str = ""
-    anthropic_api_key: str = ""
+    bedrock_model_id: str = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
     cors_origins: str = "http://localhost:3000"
 
     @property
