@@ -269,6 +269,26 @@ function Skeleton() {
   );
 }
 
+// ── Commit sparkline ────────────────────────────────────────
+
+function Sparkline({ data }: { data: number[] }) {
+  if (data.length < 2 || data.every((d) => d === 0)) return null;
+  const max = Math.max(...data, 1);
+  const W = 80, H = 22;
+  const pts = data.map((v, i) => [
+    (i / (data.length - 1)) * W,
+    H - (v / max) * (H - 4) - 2,
+  ]);
+  const line = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const area = `${line} L${W},${H} L0,${H} Z`;
+  return (
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", flexShrink: 0 }}>
+      <path d={area} fill="rgba(67,97,238,0.08)" />
+      <path d={line} fill="none" stroke="#4361ee" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // ── Main page ───────────────────────────────────────────────
 
 export default function ReportPage() {
@@ -278,11 +298,43 @@ export default function ReportPage() {
 
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
+  const [minDelayDone, setMinDelayDone] = useState(false);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("adr");
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [sparklineData, setSparklineData] = useState<number[]>([]);
+
+  // Ensure skeleton displays for at least 500ms to avoid flash
+  useEffect(() => {
+    const t = setTimeout(() => setMinDelayDone(true), 500);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Fetch GitHub commit activity for sparkline (public repos, best-effort)
+  useEffect(() => {
+    if (!report?.repo_url) return;
+    const m = report.repo_url.match(/github\.com\/([^/\s?#]+\/[^/\s?#]+)/);
+    if (!m) return;
+    const path = m[1].replace(".git", "");
+    const since = new Date(Date.now() - 30 * 86400000).toISOString();
+    fetch(`https://api.github.com/repos/${path}/commits?per_page=100&since=${since}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((commits: unknown[]) => {
+        if (!Array.isArray(commits)) return;
+        const counts = new Array(30).fill(0);
+        const now = Date.now();
+        for (const c of commits) {
+          const date = (c as { commit?: { author?: { date?: string } } }).commit?.author?.date;
+          if (!date) continue;
+          const daysAgo = Math.floor((now - new Date(date).getTime()) / 86400000);
+          if (daysAgo >= 0 && daysAgo < 30) counts[29 - daysAgo]++;
+        }
+        setSparklineData(counts);
+      })
+      .catch(() => {});
+  }, [report?.repo_url]);
 
   const fetchReport = useCallback(async () => {
     try {
@@ -350,6 +402,7 @@ export default function ReportPage() {
       ]
     : [];
 
+  const showSkeleton = loading || !minDelayDone;
   const debateMessages = (report?.band_thread ?? []).filter((m) => m.output_type === "DEBATE");
   const hasHumanReview = (report?.human_review_flags ?? []).length > 0;
   const repoName = report?.repo_url.replace("https://github.com/", "") ?? sessionId;
@@ -408,9 +461,9 @@ export default function ReportPage() {
         </header>
 
         <div className="rp-body">
-          {loading && <Skeleton />}
+          {showSkeleton && <Skeleton />}
 
-          {polling && !loading && (
+          {polling && !showSkeleton && (
             <div className="rp-poll">
               <div className="rp-poll-ring" />
               <p style={{ fontFamily: "'Space Mono', monospace", fontSize: "12px", color: "#44446a" }}>
@@ -428,10 +481,17 @@ export default function ReportPage() {
             </div>
           )}
 
-          {report && !loading && !polling && (
+          {report && !showSkeleton && !polling && (
             <>
               <div className="rp-page-title">
-                <h1>{repoName}</h1>
+                <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "6px" }}>
+                  <h1 style={{ margin: 0 }}>{repoName}</h1>
+                  {sparklineData.length > 0 && (
+                    <div title="Commit activity — last 30 days">
+                      <Sparkline data={sparklineData} />
+                    </div>
+                  )}
+                </div>
                 <p>
                   Analysis complete ·{" "}
                   {report.security_findings.length} finding{report.security_findings.length !== 1 ? "s" : ""} ·{" "}

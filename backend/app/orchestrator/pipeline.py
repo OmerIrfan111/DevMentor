@@ -29,7 +29,12 @@ async def publish_event(session_id: str, event_type: str, data: dict) -> None:
         await r.aclose()
 
 
-async def run_pipeline(session_id: str, repo_url: str, github_token: str | None) -> None:
+async def run_pipeline(
+    session_id: str,
+    repo_url: str,
+    github_token: str | None,
+    latest_sha: str | None = None,
+) -> None:
     db = get_db()
     agents_order = ["security", "architect", "onboarding", "mentor"]
 
@@ -143,6 +148,11 @@ async def run_pipeline(session_id: str, repo_url: str, github_token: str | None)
             {"session_id": session_id},
             {"$set": {"status": "completed"}},
         )
+
+        # Cache this result so the same repo+SHA returns instantly next time
+        if latest_sha:
+            from app.orchestrator.cache import put as cache_put
+            await cache_put(repo_url, latest_sha, session_id)
 
         await publish_event(session_id, "pipeline_complete", {
             "session_id": session_id,

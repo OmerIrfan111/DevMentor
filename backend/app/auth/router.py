@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, Request, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
 from app.database import get_db
 from app.models.user import UserCreate, UserOut
 from app.auth.hash import hash_password, verify_password
@@ -8,6 +8,7 @@ from app.auth.jwt import create_access_token, decode_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer = HTTPBearer()
+bearer_optional = HTTPBearer(auto_error=False)
 
 
 class LoginRequest(BaseModel):
@@ -51,9 +52,9 @@ async def login(body: LoginRequest):
     return TokenResponse(access_token=token)
 
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer)):
+async def _user_from_token(raw_token: str) -> UserOut:
     try:
-        user_id = decode_token(credentials.credentials)
+        user_id = decode_token(raw_token)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -66,3 +67,26 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(b
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return UserOut(id=str(user["_id"]), email=user["email"], name=user["name"])
+
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer)):
+    return await _user_from_token(credentials.credentials)
+
+
+async def get_current_user_sse(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_optional),
+):
+    """Like get_current_user but also accepts ?token= for EventSource clients."""
+    raw: str | None = None
+    if credentials:
+        raw = credentials.credentials
+    else:
+        raw = request.query_params.get("token")
+    if not raw:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return await _user_from_token(raw)

@@ -73,6 +73,13 @@ function AnalyzeContent() {
           throw new Error(err.detail ?? "Failed to start analysis");
         }
         const data = await res.json();
+
+        // Cache hit — pipeline already ran for this repo at the same commit
+        if (data.status === "completed") {
+          router.push(`/report/${data.session_id}`);
+          return;
+        }
+
         setSessionId(data.session_id);
 
         // Open SSE stream
