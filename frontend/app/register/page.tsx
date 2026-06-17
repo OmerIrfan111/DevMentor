@@ -2,17 +2,20 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { api } from "@/lib/api";
 import { setAuthToken } from "@/lib/auth";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const params = useSearchParams();
+  const next = params.get("next") ?? "/";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +29,7 @@ export default function RegisterPage() {
       await api.register({ name, email, password });
       const tokenData = await api.login({ email, password });
       setAuthToken(tokenData.access_token, tokenData.expires_in);
-      router.push("/");
+      router.push(next);
     } catch (err: any) {
       setError(err.message ?? "Registration failed");
     } finally {
@@ -36,133 +39,154 @@ export default function RegisterPage() {
 
   return (
     <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600&display=swap');
-        .auth-root {
-          min-height: 100vh; display: flex; flex-direction: column; align-items: center;
-          justify-content: center; background: #0a0a10; padding: 24px;
-          font-family: 'DM Sans', sans-serif; color: #dde0f0;
-          position: relative; overflow: hidden;
+      <style suppressHydrationWarning>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        .rg-root {
+          min-height: 100vh; background: #0a0a0a; color: #ffffff;
+          font-family: 'Inter', sans-serif; display: flex; flex-direction: column;
         }
-        .auth-orb {
-          position: fixed; border-radius: 50%; pointer-events: none; filter: blur(120px);
-          width: 500px; height: 500px; top: -100px; left: 50%; transform: translateX(-50%);
-          background: rgba(67,97,238,0.1); z-index: 0;
+        .rg-nav {
+          height: 52px; border-bottom: 1px solid #1a1a1a;
+          display: flex; align-items: center; padding: 0 32px;
+          position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+          background: #0a0a0a;
         }
-        .auth-card {
-          position: relative; z-index: 1; width: 100%; max-width: 400px;
-          background: #0e0e17; border: 1px solid #1c1c2e; border-radius: 16px;
-          padding: 36px 32px;
+        .rg-logo {
+          font-size: 13px; font-weight: 700; color: #ffffff;
+          text-decoration: none; letter-spacing: -0.02em; text-transform: uppercase;
         }
-        .auth-logo {
-          font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700;
-          color: #4361ee; border: 1px solid rgba(67,97,238,0.3); border-radius: 5px;
-          padding: 2px 7px; display: inline-block; margin-bottom: 28px;
-          text-decoration: none;
+        .rg-body {
+          flex: 1; display: flex; align-items: center; justify-content: center;
+          padding: 80px 24px 40px;
         }
-        .auth-title {
-          font-family: 'Space Mono', monospace; font-size: 22px; font-weight: 700;
-          color: #dde0f0; margin-bottom: 6px;
+        .rg-panel { width: 100%; max-width: 380px; }
+        .rg-eyebrow {
+          font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+          text-transform: uppercase; color: #f5a623; margin-bottom: 20px;
         }
-        .auth-sub { font-size: 13px; color: #44446a; margin-bottom: 28px; }
-        .auth-sub a { color: #4361ee; text-decoration: none; }
-        .auth-sub a:hover { text-decoration: underline; }
-        .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-        .field-label {
-          font-size: 12px; font-weight: 500; color: #55567a;
-          font-family: 'Space Mono', monospace; letter-spacing: 0.05em;
+        .rg-headline {
+          font-size: 36px; font-weight: 900; line-height: 1; letter-spacing: -0.04em;
+          color: #ffffff; margin-bottom: 32px;
         }
-        .field-input {
-          background: #13131c; border: 1px solid #22223a; border-radius: 8px;
-          padding: 11px 14px; font-size: 13px; color: #dde0f0; outline: none;
-          font-family: 'DM Sans', sans-serif; transition: border-color 0.2s;
+        .rg-field { display: flex; flex-direction: column; }
+        .rg-field + .rg-field { border-top: 1px solid #1a1a1a; }
+        .rg-form-block { border: 1px solid #222222; margin-bottom: 16px; }
+        .rg-label {
+          display: block; font-size: 9px; font-weight: 700; letter-spacing: 0.14em;
+          text-transform: uppercase; color: #555555; padding: 10px 14px 0;
         }
-        .field-input:focus { border-color: rgba(67,97,238,0.5); }
-        .field-input::placeholder { color: #2a2a44; }
-        .error-msg {
-          background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
-          border-radius: 7px; padding: 10px 12px; font-size: 12px; color: #f87171;
-          margin-bottom: 14px;
+        .rg-input {
+          width: 100%; background: transparent; border: none; outline: none;
+          color: #ffffff; font-family: 'Inter', sans-serif; font-size: 14px;
+          padding: 6px 14px 10px; caret-color: #f5a623;
         }
-        .auth-btn {
-          width: 100%; padding: 13px; border-radius: 9px;
-          background: #4361ee; color: #fff; border: none; cursor: pointer;
-          font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 14px;
-          box-shadow: 0 4px 24px rgba(67,97,238,0.2);
-          transition: background 0.2s, opacity 0.2s; margin-top: 4px;
+        .rg-input::placeholder { color: #333333; }
+        .rg-input:focus { background: #0f0f0f; }
+        .rg-error {
+          border: 1px solid #f5a62330; background: #f5a62308;
+          padding: 10px 14px; font-size: 12px; color: #f5a623; margin-bottom: 16px;
         }
-        .auth-btn:hover:not(:disabled) { background: #3751d4; }
-        .auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .terms {
-          font-size: 11px; color: #2a2a44; text-align: center; margin-top: 14px; line-height: 1.5;
+        .rg-submit {
+          width: 100%; padding: 14px; background: #ffffff; color: #0a0a0a;
+          border: none; border-radius: 0; cursor: pointer;
+          font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 700;
+          letter-spacing: 0.1em; text-transform: uppercase;
+          transition: background 0.15s;
         }
+        .rg-submit:hover:not(:disabled) { background: #f5a623; }
+        .rg-submit:disabled { background: #333333; color: #555555; cursor: not-allowed; }
+        .rg-terms {
+          margin-top: 12px; font-size: 11px; color: #333333; text-align: center;
+        }
+        .rg-foot {
+          margin-top: 20px; font-size: 12px; color: #555555; text-align: center;
+        }
+        .rg-foot a { color: #ffffff; text-decoration: none; font-weight: 500; }
+        .rg-foot a:hover { color: #f5a623; }
       `}</style>
 
-      <div className="auth-root">
-        <div className="auth-orb" aria-hidden />
-        <div className="auth-card">
-          <Link href="/" className="auth-logo">DM/</Link>
-          <h1 className="auth-title">Create account.</h1>
-          <p className="auth-sub">
-            Already have one? <Link href="/login">Sign in</Link>
-          </p>
+      <div className="rg-root">
+        <nav className="rg-nav">
+          <Link href="/" className="rg-logo">DevMentor / Band</Link>
+        </nav>
 
-          <form onSubmit={handleSubmit}>
-            <div className="field">
-              <label className="field-label" htmlFor="name">Name</label>
-              <input
-                id="name"
-                className="field-input"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
-                required
-                autoComplete="name"
-              />
-            </div>
+        <div className="rg-body">
+          <div className="rg-panel">
+            <p className="rg-eyebrow">Get started</p>
+            <h1 className="rg-headline">Create account.</h1>
 
-            <div className="field">
-              <label className="field-label" htmlFor="email">Email</label>
-              <input
-                id="email"
-                className="field-input"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                autoComplete="email"
-              />
-            </div>
+            <form onSubmit={handleSubmit}>
+              <div className="rg-form-block">
+                <div className="rg-field">
+                  <label className="rg-label" htmlFor="name">Name</label>
+                  <input
+                    id="name"
+                    className="rg-input"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Your name"
+                    required
+                    autoComplete="name"
+                  />
+                </div>
+                <div className="rg-field">
+                  <label className="rg-label" htmlFor="email">Email</label>
+                  <input
+                    id="email"
+                    className="rg-input"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+                <div className="rg-field">
+                  <label className="rg-label" htmlFor="password">Password</label>
+                  <input
+                    id="password"
+                    className="rg-input"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="8+ characters"
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                  />
+                </div>
+              </div>
 
-            <div className="field">
-              <label className="field-label" htmlFor="password">Password</label>
-              <input
-                id="password"
-                className="field-input"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="8+ characters"
-                required
-                minLength={8}
-                autoComplete="new-password"
-              />
-            </div>
+              {error && <div className="rg-error">{error}</div>}
 
-            {error && <div className="error-msg">{error}</div>}
+              <button type="submit" className="rg-submit" disabled={loading}>
+                {loading ? "Creating account…" : "Create account →"}
+              </button>
 
-            <button type="submit" className="auth-btn" disabled={loading}>
-              {loading ? "Creating account…" : "Create account →"}
-            </button>
+              <p className="rg-terms">Free for the hackathon. No credit card required.</p>
+            </form>
 
-            <p className="terms">
-              Free for the hackathon. No credit card required.
+            <p className="rg-foot">
+              Already have one? <Link href="/login">Sign in</Link>
             </p>
-          </form>
+          </div>
         </div>
       </div>
     </>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontFamily: "Inter, sans-serif", color: "#333333", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Loading…</span>
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }

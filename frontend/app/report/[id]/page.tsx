@@ -7,34 +7,23 @@ import { api, type Report, type SecurityFinding, type MentorFeedback, type First
 import { getAuthToken } from "@/lib/auth";
 import MarkdownViewer from "@/components/MarkdownViewer";
 
-// ── Types ──────────────────────────────────────────────────
+type TabId = "adr" | "contributing" | "setup" | "issues" | "mentor" | "security";
 
-type TabId = "adr" | "contributing" | "issues" | "mentor" | "security";
-
-// ── Severity helpers ────────────────────────────────────────
-
-const SEVERITY_STYLE: Record<string, { bg: string; color: string }> = {
-  HIGH:   { bg: "rgba(239,68,68,0.12)",   color: "#f87171" },
-  MEDIUM: { bg: "rgba(245,158,11,0.12)",  color: "#fbbf24" },
-  LOW:    { bg: "rgba(34,197,94,0.12)",   color: "#4ade80" },
+const SEVERITY_COLOR: Record<string, string> = {
+  HIGH: "#ff4444", MEDIUM: "#f5a623", LOW: "#44ff88",
 };
 
-const DIFFICULTY_STYLE: Record<string, { bg: string; color: string }> = {
-  easy:   { bg: "rgba(34,197,94,0.12)",   color: "#4ade80" },
-  medium: { bg: "rgba(245,158,11,0.12)",  color: "#fbbf24" },
-  hard:   { bg: "rgba(239,68,68,0.12)",   color: "#f87171" },
+const DIFFICULTY_COLOR: Record<string, string> = {
+  easy: "#44ff88", medium: "#f5a623", hard: "#ff4444",
 };
-
-// ── Tab content components ──────────────────────────────────
 
 function SecurityTab({ findings }: { findings: SecurityFinding[] }) {
   if (findings.length === 0) {
     return (
-      <div style={{ textAlign: "center", padding: "60px 20px" }}>
-        <div style={{ fontSize: "28px", marginBottom: "10px" }}>✓</div>
-        <p style={{ color: "#4ade80", fontFamily: "'Space Mono', monospace", fontSize: "13px" }}>
-          No security findings detected.
-        </p>
+      <div style={{ padding: "60px 0", textAlign: "center" }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#44ff88" }}>
+          No security findings detected
+        </div>
       </div>
     );
   }
@@ -45,26 +34,26 @@ function SecurityTab({ findings }: { findings: SecurityFinding[] }) {
   }, {});
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
       {(["HIGH", "MEDIUM", "LOW"] as const).map((sev) =>
         (byGroup[sev] ?? []).map((f, i) => {
-          const s = SEVERITY_STYLE[sev];
+          const col = SEVERITY_COLOR[sev];
           return (
-            <div key={`${sev}-${i}`} style={{ background: "#0e0e17", border: `1px solid ${s.color}30`, borderRadius: "10px", padding: "18px 20px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-                <span style={{ background: s.bg, color: s.color, fontFamily: "'Space Mono', monospace", fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: "4px", letterSpacing: "0.06em" }}>
+            <div key={`${sev}-${i}`} style={{ borderLeft: `2px solid ${col}`, border: `1px solid ${col}20`, padding: "18px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: col }}>
                   {sev}
                 </span>
-                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: "12px", color: "#6668a0" }}>
+                <span style={{ fontSize: 11, color: "#444444", fontFamily: "monospace" }}>
                   {f.file}{f.line != null ? `:${f.line}` : ""}
                 </span>
               </div>
-              <p style={{ fontSize: "14px", color: "#c8ccee", marginBottom: "10px", fontWeight: 500 }}>
+              <p style={{ fontSize: 14, color: "#ffffff", marginBottom: 10, fontWeight: 500, letterSpacing: "-0.01em" }}>
                 {f.issue}
               </p>
-              <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                <span style={{ color: "#4361ee", fontFamily: "'Space Mono', monospace", fontSize: "11px", marginTop: "1px", flexShrink: 0 }}>→</span>
-                <p style={{ fontSize: "13px", color: "#8890c0", margin: 0, lineHeight: "1.6" }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <span style={{ color: "#f5a623", fontSize: 11, marginTop: 1, flexShrink: 0 }}>→</span>
+                <p style={{ fontSize: 12, color: "#666666", margin: 0, lineHeight: 1.6 }}>
                   {f.recommendation}
                 </p>
               </div>
@@ -79,46 +68,43 @@ function SecurityTab({ findings }: { findings: SecurityFinding[] }) {
 function IssuesTab({ issues }: { issues: FirstGoodIssue[] }) {
   if (issues.length === 0) {
     return (
-      <p style={{ color: "#44446a", fontFamily: "'Space Mono', monospace", fontSize: "13px" }}>
+      <p style={{ fontSize: 11, color: "#333333", letterSpacing: "0.08em", textTransform: "uppercase" }}>
         No starter issues generated.
       </p>
     );
   }
-
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
       {issues.map((issue, i) => {
-        const diff = DIFFICULTY_STYLE[issue.difficulty] ?? DIFFICULTY_STYLE.easy;
+        const col = DIFFICULTY_COLOR[issue.difficulty] ?? "#44ff88";
         return (
-          <div key={i} style={{ background: "#0e0e17", border: "1px solid #1c1c2e", borderRadius: "10px", padding: "20px 22px" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", marginBottom: "10px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: "11px", color: "#44446a" }}>
-                  #{i + 1}
+          <div key={i} style={{ border: "1px solid #1a1a1a", padding: "20px 22px" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.04em", color: "#1a1a1a", lineHeight: 1 }}>
+                  {String(i + 1).padStart(2, "0")}
                 </span>
-                <h3 style={{ fontSize: "15px", fontWeight: 600, color: "#c8ccee", margin: 0 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#ffffff", letterSpacing: "-0.02em" }}>
                   {issue.title}
                 </h3>
               </div>
-              <span style={{ background: diff.bg, color: diff.color, fontFamily: "'Space Mono', monospace", fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: "4px", letterSpacing: "0.06em", flexShrink: 0 }}>
-                {issue.difficulty.toUpperCase()}
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: col, flexShrink: 0 }}>
+                {issue.difficulty}
               </span>
             </div>
-
-            <p style={{ fontSize: "13px", color: "#8890c0", lineHeight: "1.7", marginBottom: "14px" }}>
+            <p style={{ fontSize: 13, color: "#666666", lineHeight: 1.7, marginBottom: 14 }}>
               {issue.description}
             </p>
-
             {issue.acceptance_criteria.length > 0 && (
               <div>
-                <p style={{ fontSize: "11px", color: "#44446a", fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: "0.08em", marginBottom: "8px" }}>
-                  ACCEPTANCE CRITERIA
+                <p style={{ fontSize: 9, color: "#333333", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 8 }}>
+                  Acceptance criteria
                 </p>
-                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "5px" }}>
+                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 5 }}>
                   {issue.acceptance_criteria.map((c, j) => (
-                    <li key={j} style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-                      <span style={{ color: "#22c55e", fontSize: "12px", marginTop: "1px", flexShrink: 0 }}>✓</span>
-                      <span style={{ fontSize: "13px", color: "#7880b0" }}>{c}</span>
+                    <li key={j} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <span style={{ color: "#44ff88", fontSize: 11, marginTop: 1, flexShrink: 0 }}>✓</span>
+                      <span style={{ fontSize: 12, color: "#666666" }}>{c}</span>
                     </li>
                   ))}
                 </ul>
@@ -145,99 +131,81 @@ function MentorTab({
   const total = score.questions + score.corrections;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-      {/* Socratic Score */}
-      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-        <div style={{ background: "rgba(168,85,247,0.08)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: "10px", padding: "16px 24px", minWidth: "140px" }}>
-          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "28px", fontWeight: 700, color: "#a855f7", marginBottom: "4px" }}>
-            {score.questions}
-          </div>
-          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", color: "#6668a0", letterSpacing: "0.08em" }}>
-            QUESTIONS
-          </div>
-        </div>
-        <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "10px", padding: "16px 24px", minWidth: "140px" }}>
-          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "28px", fontWeight: 700, color: "#f59e0b", marginBottom: "4px" }}>
-            {score.corrections}
-          </div>
-          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", color: "#6668a0", letterSpacing: "0.08em" }}>
-            CORRECTIONS
-          </div>
-        </div>
-        {total > 0 && (
-          <div style={{ background: "rgba(67,97,238,0.08)", border: "1px solid rgba(67,97,238,0.2)", borderRadius: "10px", padding: "16px 24px", minWidth: "140px" }}>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "28px", fontWeight: 700, color: "#4361ee", marginBottom: "4px" }}>
-              {total}
+    <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
+      <div style={{ display: "flex", gap: 1 }}>
+        {[
+          { label: "Questions", value: score.questions, color: "#ffffff" },
+          { label: "Corrections", value: score.corrections, color: "#f5a623" },
+          ...(total > 0 ? [{ label: "Total insights", value: total, color: "#999999" }] : []),
+        ].map((s) => (
+          <div key={s.label} style={{ border: "1px solid #1a1a1a", padding: "20px 28px", flex: 1 }}>
+            <div style={{ fontSize: 36, fontWeight: 900, letterSpacing: "-0.04em", color: s.color, lineHeight: 1, marginBottom: 6 }}>
+              {s.value}
             </div>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", color: "#6668a0", letterSpacing: "0.08em" }}>
-              TOTAL INSIGHTS
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#444444" }}>
+              {s.label}
             </div>
           </div>
-        )}
+        ))}
       </div>
 
-      {/* Questions */}
       {questions.length > 0 && (
         <div>
-          <p style={{ fontFamily: "'Space Mono', monospace", fontSize: "11px", color: "#44446a", letterSpacing: "0.08em", fontWeight: 700, marginBottom: "12px" }}>
-            SOCRATIC QUESTIONS
+          <p style={{ fontSize: 9, color: "#444444", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 12 }}>
+            Socratic questions
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {questions.map((q, i) => (
-              <div key={i} style={{ background: "#0e0e17", border: "1px solid #1c1c2e", borderRadius: "8px", padding: "14px 16px", display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                <span style={{ color: "#a855f7", fontFamily: "'Space Mono', monospace", fontSize: "14px", marginTop: "1px", flexShrink: 0 }}>?</span>
-                <p style={{ fontSize: "14px", color: "#a0a8d0", lineHeight: "1.7", margin: 0 }}>{q.text}</p>
+              <div key={i} style={{ border: "1px solid #1a1a1a", padding: "14px 16px", display: "flex", gap: 14, alignItems: "flex-start" }}>
+                <span style={{ color: "#f5a623", fontSize: 16, fontWeight: 900, flexShrink: 0, lineHeight: 1.4 }}>?</span>
+                <p style={{ fontSize: 14, color: "#cccccc", lineHeight: 1.7, margin: 0 }}>{q.text}</p>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Corrections */}
       {corrections.length > 0 && (
         <div>
-          <p style={{ fontFamily: "'Space Mono', monospace", fontSize: "11px", color: "#44446a", letterSpacing: "0.08em", fontWeight: 700, marginBottom: "12px" }}>
-            CORRECTIONS
+          <p style={{ fontSize: 9, color: "#444444", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 12 }}>
+            Corrections
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
             {corrections.map((c, i) => (
-              <div key={i} style={{ background: "#0e0e17", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "8px", padding: "14px 16px", display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                <span style={{ color: "#f59e0b", fontFamily: "'Space Mono', monospace", fontSize: "13px", marginTop: "1px", flexShrink: 0 }}>!</span>
-                <p style={{ fontSize: "14px", color: "#a0a8d0", lineHeight: "1.7", margin: 0 }}>{c.text}</p>
+              <div key={i} style={{ border: "1px solid #f5a62320", borderLeft: "2px solid #f5a623", padding: "14px 16px", display: "flex", gap: 14, alignItems: "flex-start" }}>
+                <span style={{ color: "#f5a623", fontSize: 13, fontWeight: 900, flexShrink: 0, lineHeight: 1.5 }}>!</span>
+                <p style={{ fontSize: 14, color: "#cccccc", lineHeight: 1.7, margin: 0 }}>{c.text}</p>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Agent Debate */}
       {debateMessages.length > 0 && (
         <div>
-          <p style={{ fontFamily: "'Space Mono', monospace", fontSize: "11px", color: "#44446a", letterSpacing: "0.08em", fontWeight: 700, marginBottom: "12px" }}>
-            AGENT DEBATE
+          <p style={{ fontSize: 9, color: "#444444", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 12 }}>
+            Agent debate
           </p>
-          <div style={{ border: "1px solid rgba(67,97,238,0.2)", borderRadius: "10px", overflow: "hidden" }}>
-            <div style={{ background: "rgba(67,97,238,0.06)", padding: "10px 16px", borderBottom: "1px solid rgba(67,97,238,0.2)" }}>
-              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", color: "#4361ee", letterSpacing: "0.08em" }}>
-                MENTOR ↔ ARCHITECT
+          <div style={{ border: "1px solid #1a1a1a" }}>
+            <div style={{ borderBottom: "1px solid #1a1a1a", padding: "10px 16px", background: "#0f0f0f" }}>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#f5a623" }}>
+                Mentor ↔ Architect
               </span>
             </div>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {debateMessages.map((m, i) => (
-                <div key={i} style={{ padding: "16px", borderBottom: i < debateMessages.length - 1 ? "1px solid #1c1c2e" : "none" }}>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: "10px", color: "#44446a", marginBottom: "6px", textTransform: "uppercase" }}>
-                    {m.agent} · {m.output_type}
-                  </div>
-                  <MarkdownViewer content={m.content} />
+            {debateMessages.map((m, i) => (
+              <div key={i} style={{ padding: 16, borderBottom: i < debateMessages.length - 1 ? "1px solid #1a1a1a" : "none" }}>
+                <div style={{ fontSize: 9, color: "#444444", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 6 }}>
+                  {m.agent} · {m.output_type}
                 </div>
-              ))}
-            </div>
+                <MarkdownViewer content={m.content} />
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       {feedback.length === 0 && debateMessages.length === 0 && (
-        <p style={{ color: "#44446a", fontFamily: "'Space Mono', monospace", fontSize: "13px" }}>
+        <p style={{ fontSize: 11, color: "#333333", letterSpacing: "0.08em", textTransform: "uppercase" }}>
           No mentor feedback available.
         </p>
       )}
@@ -245,36 +213,32 @@ function MentorTab({
   );
 }
 
-// ── Loading skeleton ────────────────────────────────────────
-
 function Skeleton() {
   return (
     <>
-      <style>{`
-        @keyframes shimmerSlide { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
-        .sk { background: #0e0e17; border-radius: 6px; overflow: hidden; position: relative; }
-        .sk::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(67,97,238,0.06),transparent); animation:shimmerSlide 1.6s infinite; }
+      <style suppressHydrationWarning>{`
+        @keyframes skShimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+        .sk { background: #111111; overflow: hidden; position: relative; }
+        .sk::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.03),transparent); animation:skShimmer 1.6s infinite; }
       `}</style>
-      <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-        <div className="sk" style={{ height: "20px", width: "340px" }} />
-        <div className="sk" style={{ height: "14px", width: "220px" }} />
-        <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-          {[80, 130, 80, 70, 90].map((w, i) => (
-            <div key={i} className="sk" style={{ height: "32px", width: `${w}px` }} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="sk" style={{ height: 20, width: 320 }} />
+        <div className="sk" style={{ height: 12, width: 200 }} />
+        <div style={{ display: "flex", gap: 1, marginTop: 8 }}>
+          {[80, 130, 80, 70, 90, 90].map((w, i) => (
+            <div key={i} className="sk" style={{ height: 34, width: w }} />
           ))}
         </div>
-        <div className="sk" style={{ height: "400px", marginTop: "8px" }} />
+        <div className="sk" style={{ height: 400, marginTop: 8 }} />
       </div>
     </>
   );
 }
 
-// ── Commit sparkline ────────────────────────────────────────
-
 function Sparkline({ data }: { data: number[] }) {
   if (data.length < 2 || data.every((d) => d === 0)) return null;
   const max = Math.max(...data, 1);
-  const W = 80, H = 22;
+  const W = 80, H = 20;
   const pts = data.map((v, i) => [
     (i / (data.length - 1)) * W,
     H - (v / max) * (H - 4) - 2,
@@ -283,13 +247,11 @@ function Sparkline({ data }: { data: number[] }) {
   const area = `${line} L${W},${H} L0,${H} Z`;
   return (
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: "block", flexShrink: 0 }}>
-      <path d={area} fill="rgba(67,97,238,0.08)" />
-      <path d={line} fill="none" stroke="#4361ee" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <path d={area} fill="rgba(245,166,35,0.08)" />
+      <path d={line} fill="none" stroke="#f5a623" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
 }
-
-// ── Main page ───────────────────────────────────────────────
 
 export default function ReportPage() {
   const params = useParams();
@@ -306,13 +268,11 @@ export default function ReportPage() {
   const [downloading, setDownloading] = useState(false);
   const [sparklineData, setSparklineData] = useState<number[]>([]);
 
-  // Ensure skeleton displays for at least 500ms to avoid flash
   useEffect(() => {
     const t = setTimeout(() => setMinDelayDone(true), 500);
     return () => clearTimeout(t);
   }, []);
 
-  // Fetch GitHub commit activity for sparkline (public repos, best-effort)
   useEffect(() => {
     if (!report?.repo_url) return;
     const m = report.repo_url.match(/github\.com\/([^/\s?#]+\/[^/\s?#]+)/);
@@ -344,15 +304,8 @@ export default function ReportPage() {
       setPolling(false);
     } catch (e: unknown) {
       const err = e as Error & { status?: number };
-      if (err.status === 202) {
-        setPolling(true);
-        setLoading(false);
-        return;
-      }
-      if (err.status === 401) {
-        router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
-        return;
-      }
+      if (err.status === 202) { setPolling(true); setLoading(false); return; }
+      if (err.status === 401) { router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`); return; }
       setError(err.message ?? "Failed to load report");
       setLoading(false);
     }
@@ -383,22 +336,17 @@ export default function ReportPage() {
   const handleDownload = async () => {
     if (!sessionId) return;
     setDownloading(true);
-    try {
-      await api.downloadReport(sessionId);
-    } catch {
-      // silently ignore download errors
-    } finally {
-      setDownloading(false);
-    }
+    try { await api.downloadReport(sessionId); } catch { /* ignore */ } finally { setDownloading(false); }
   };
 
-  const tabs: { id: TabId; label: string; agentColor: string; count?: number }[] = report
+  const tabs: { id: TabId; label: string; count?: number }[] = report
     ? [
-        { id: "adr",          label: "ADR.md",          agentColor: "#4361ee" },
-        { id: "contributing", label: "CONTRIBUTING.md", agentColor: "#06b6d4" },
-        { id: "issues",       label: "Issues",          agentColor: "#06b6d4", count: report.first_good_issues.length },
-        { id: "mentor",       label: "Mentor",          agentColor: "#a855f7", count: report.mentor_feedback.length },
-        { id: "security",     label: "Security",        agentColor: "#f59e0b", count: report.security_findings.length },
+        { id: "adr", label: "ADR.md" },
+        { id: "contributing", label: "CONTRIBUTING" },
+        ...(report.setup_walkthrough ? [{ id: "setup" as TabId, label: "Setup" }] : []),
+        { id: "issues", label: "Issues", count: report.first_good_issues.length },
+        { id: "mentor", label: "Mentor", count: report.mentor_feedback.length },
+        { id: "security", label: "Security", count: report.security_findings.length },
       ]
     : [];
 
@@ -409,102 +357,129 @@ export default function ReportPage() {
 
   return (
     <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600&display=swap');
-        .rp-root { min-height: 100vh; background: #0a0a10; color: #dde0f0; font-family: 'DM Sans', sans-serif; }
-        .rp-header-inner { display: flex; align-items: center; gap: 14px; padding: 16px 32px; max-width: 1100px; margin: 0 auto; }
-        .rp-logo { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; color: #4361ee; text-decoration: none; flex-shrink: 0; }
-        .rp-repo { font-family: 'Space Mono', monospace; font-size: 11px; color: #44446a; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .rp-body { max-width: 1100px; margin: 0 auto; padding: 32px 32px 60px; }
-        .rp-page-title { margin-bottom: 24px; }
-        .rp-page-title h1 { font-size: 20px; font-weight: 700; color: #c8ccee; margin-bottom: 4px; }
-        .rp-page-title p { font-family: 'Space Mono', monospace; font-size: 11px; color: #44446a; margin: 0; }
-        .rp-review-banner { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
-        .rp-review-text { font-size: 13px; color: #fbbf24; }
-        .rp-tabs { display: flex; gap: 0; border-bottom: 1px solid #1c1c2e; margin-bottom: 28px; overflow-x: auto; }
-        .rp-tab { display: flex; align-items: center; gap: 7px; padding: 10px 16px; font-size: 12px; color: #44446a; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: color 0.15s, border-color 0.15s; background: none; border-top: none; border-left: none; border-right: none; font-family: 'Space Mono', monospace; }
-        .rp-tab:hover { color: #8890c0; }
-        .rp-tab.active { color: #c8ccee; border-bottom-color: var(--tc); }
-        .rp-tab-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tc); flex-shrink: 0; }
-        .rp-tab-count { background: #1c1c2e; color: #6668a0; font-size: 10px; padding: 1px 6px; border-radius: 10px; }
-        .rp-content { min-height: 300px; }
-        .rp-btn { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 7px; font-size: 11px; font-family: 'Space Mono', monospace; font-weight: 700; cursor: pointer; border: 1px solid; transition: opacity 0.15s; letter-spacing: 0.02em; }
-        .rp-btn:hover:not(:disabled) { opacity: 0.75; }
-        .rp-btn:disabled { cursor: not-allowed; opacity: 0.5; }
-        .rp-btn-primary { background: rgba(67,97,238,0.12); color: #4361ee; border-color: rgba(67,97,238,0.3); }
-        .rp-btn-ghost { background: transparent; color: #6668a0; border-color: #1c1c2e; }
-        .rp-actions { display: flex; gap: 8px; flex-shrink: 0; }
+      <style suppressHydrationWarning>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        .rp-root { min-height: 100vh; background: #0a0a0a; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .rp-nav {
+          height: 52px; border-bottom: 1px solid #1a1a1a; display: flex; align-items: stretch;
+          position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: #0a0a0a;
+        }
+        .rp-nav-logo {
+          display: flex; align-items: center; padding: 0 24px; border-right: 1px solid #1a1a1a;
+          font-size: 13px; font-weight: 700; color: #ffffff; text-decoration: none;
+          letter-spacing: -0.02em; text-transform: uppercase; flex-shrink: 0;
+        }
+        .rp-nav-repo {
+          flex: 1; display: flex; align-items: center; padding: 0 20px;
+          font-size: 11px; color: #333333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .rp-nav-actions { display: flex; align-items: stretch; border-left: 1px solid #1a1a1a; }
+        .rp-nav-btn {
+          display: flex; align-items: center; padding: 0 18px; border: none; border-right: 1px solid #1a1a1a;
+          cursor: pointer; font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700;
+          letter-spacing: 0.1em; text-transform: uppercase; transition: background 0.15s; background: transparent;
+        }
+        .rp-nav-btn.ghost { color: #555555; }
+        .rp-nav-btn.ghost:hover { background: #111111; color: #ffffff; }
+        .rp-nav-btn.primary { background: #ffffff; color: #0a0a0a; }
+        .rp-nav-btn.primary:hover { background: #f5a623; }
+        .rp-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .rp-body { max-width: 1100px; margin: 0 auto; padding: 72px 0 60px; }
+        .rp-header { padding: 32px 24px 0; }
+        .rp-title-row { display: flex; align-items: center; gap: 16px; margin-bottom: 6px; }
+        .rp-title { font-size: 28px; font-weight: 900; letter-spacing: -0.04em; }
+        .rp-meta { font-size: 10px; color: #444444; letter-spacing: 0.1em; text-transform: uppercase; }
+        .rp-review-banner {
+          border: 1px solid #f5a62330; border-left: 2px solid #f5a623;
+          padding: 12px 16px; margin: 20px 24px 0; display: flex; align-items: center; gap: 10px;
+        }
+        .rp-review-text { font-size: 12px; color: #f5a623; }
+        .rp-tabs {
+          display: flex; border-bottom: 1px solid #1a1a1a; margin-top: 28px;
+          overflow-x: auto; padding: 0 24px;
+        }
+        .rp-tab {
+          display: flex; align-items: center; gap: 7px; padding: 12px 14px;
+          font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+          color: #444444; cursor: pointer; border: none; background: none;
+          border-bottom: 2px solid transparent; white-space: nowrap;
+          font-family: 'Inter', sans-serif; transition: color 0.15s, border-color 0.15s;
+          margin-bottom: -1px;
+        }
+        .rp-tab:hover { color: #888888; }
+        .rp-tab.active { color: #ffffff; border-bottom-color: #f5a623; }
+        .rp-tab-count {
+          font-size: 9px; color: #333333; padding: 1px 5px; border: 1px solid #222222;
+        }
+        .rp-content { padding: 32px 24px; min-height: 300px; }
         .rp-poll { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 80px 20px; }
-        .rp-poll-ring { width: 36px; height: 36px; border: 2px solid #1c1c2e; border-top-color: #4361ee; border-radius: 50%; animation: spin 0.9s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .rp-poll-ring { width: 32px; height: 32px; border: 1px solid #222222; border-top-color: #f5a623; border-radius: 50%; animation: rpspin 0.9s linear infinite; }
+        .rp-poll-text { font-size: 10px; color: #333333; letter-spacing: 0.12em; text-transform: uppercase; }
+        @keyframes rpspin { to { transform: rotate(360deg); } }
       `}</style>
 
       <div className="rp-root">
-        {/* Header */}
-        <header style={{ borderBottom: "1px solid #1c1c2e" }}>
-          <div className="rp-header-inner">
-            <Link href="/" className="rp-logo">DM/Band</Link>
-            <span className="rp-repo">{report?.repo_url ?? sessionId}</span>
-            <div className="rp-actions">
-              {report?.share_token && (
-                <button onClick={handleCopyShare} className="rp-btn rp-btn-ghost">
-                  {copied ? "✓ Copied!" : "Share"}
-                </button>
-              )}
-              {report && (
-                <button onClick={handleDownload} disabled={downloading} className="rp-btn rp-btn-primary">
-                  {downloading ? "Saving…" : "Download ZIP"}
-                </button>
-              )}
-            </div>
+        <nav className="rp-nav">
+          <Link href="/" className="rp-nav-logo">DM/Band</Link>
+          <span className="rp-nav-repo">{report?.repo_url ?? sessionId}</span>
+          <div className="rp-nav-actions">
+            {report?.share_token && (
+              <button onClick={handleCopyShare} className="rp-nav-btn ghost">
+                {copied ? "✓ Copied" : "Share"}
+              </button>
+            )}
+            {report && (
+              <button onClick={handleDownload} disabled={downloading} className="rp-nav-btn primary">
+                {downloading ? "Saving…" : "Download ZIP"}
+              </button>
+            )}
           </div>
-        </header>
+        </nav>
 
         <div className="rp-body">
-          {showSkeleton && <Skeleton />}
+          {showSkeleton && (
+            <div style={{ padding: "32px 24px" }}>
+              <Skeleton />
+            </div>
+          )}
 
           {polling && !showSkeleton && (
             <div className="rp-poll">
               <div className="rp-poll-ring" />
-              <p style={{ fontFamily: "'Space Mono', monospace", fontSize: "12px", color: "#44446a" }}>
-                Analysis in progress — waiting for agents…
-              </p>
+              <p className="rp-poll-text">Analysis in progress — waiting for agents…</p>
             </div>
           )}
 
           {error && (
-            <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "10px", padding: "20px 24px" }}>
-              <p style={{ color: "#f87171", fontSize: "14px", margin: 0 }}>{error}</p>
-              <Link href="/" style={{ color: "#4361ee", fontSize: "13px", display: "inline-block", marginTop: "10px" }}>
-                ← Back to home
-              </Link>
+            <div style={{ padding: "32px 24px" }}>
+              <div style={{ border: "1px solid #ff444430", padding: "20px 24px" }}>
+                <p style={{ color: "#ff4444", fontSize: 14 }}>{error}</p>
+                <Link href="/" style={{ color: "#ffffff", fontSize: 12, display: "inline-block", marginTop: 10 }}>← Back to home</Link>
+              </div>
             </div>
           )}
 
           {report && !showSkeleton && !polling && (
             <>
-              <div className="rp-page-title">
-                <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "6px" }}>
-                  <h1 style={{ margin: 0 }}>{repoName}</h1>
+              <div className="rp-header">
+                <div className="rp-title-row">
+                  <h1 className="rp-title">{repoName}</h1>
                   {sparklineData.length > 0 && (
                     <div title="Commit activity — last 30 days">
                       <Sparkline data={sparklineData} />
                     </div>
                   )}
                 </div>
-                <p>
-                  Analysis complete ·{" "}
-                  {report.security_findings.length} finding{report.security_findings.length !== 1 ? "s" : ""} ·{" "}
-                  {report.first_good_issues.length} starter issue{report.first_good_issues.length !== 1 ? "s" : ""}
+                <p className="rp-meta">
+                  Analysis complete · {report.security_findings.length} finding{report.security_findings.length !== 1 ? "s" : ""} · {report.first_good_issues.length} starter issue{report.first_good_issues.length !== 1 ? "s" : ""}
                 </p>
               </div>
 
               {hasHumanReview && (
                 <div className="rp-review-banner">
-                  <span style={{ fontSize: "16px" }}>⚠</span>
-                  <span className="rp-review-text">
-                    Human review recommended — one or more agents flagged low-confidence findings.
-                  </span>
+                  <span style={{ fontSize: 14 }}>⚠</span>
+                  <span className="rp-review-text">Human review recommended — one or more agents flagged low-confidence findings.</span>
                 </div>
               )}
 
@@ -513,10 +488,8 @@ export default function ReportPage() {
                   <button
                     key={tab.id}
                     className={`rp-tab${activeTab === tab.id ? " active" : ""}`}
-                    style={{ "--tc": tab.agentColor } as React.CSSProperties}
                     onClick={() => setActiveTab(tab.id)}
                   >
-                    <span className="rp-tab-dot" />
                     {tab.label}
                     {tab.count !== undefined && (
                       <span className="rp-tab-count">{tab.count}</span>
@@ -528,6 +501,7 @@ export default function ReportPage() {
               <div className="rp-content">
                 {activeTab === "adr" && <MarkdownViewer content={report.adr} />}
                 {activeTab === "contributing" && <MarkdownViewer content={report.contributing} />}
+                {activeTab === "setup" && <MarkdownViewer content={report.setup_walkthrough ?? ""} />}
                 {activeTab === "issues" && <IssuesTab issues={report.first_good_issues} />}
                 {activeTab === "mentor" && (
                   <MentorTab

@@ -1,5 +1,4 @@
-import json
-from app.agents.base import BaseAgent
+from app.agents.base import BaseAgent, safe_parse_json
 
 SYSTEM_PROMPT = """You are a senior security engineer performing a code security audit.
 
@@ -53,16 +52,9 @@ File contents:
 
         raw = await self.call_llm(SYSTEM_PROMPT, user_msg, max_tokens=2048)
 
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            import re
-            m = re.search(r"\{.*\}", raw, re.DOTALL)
-            data = json.loads(m.group()) if m else {
-                "summary": raw[:200],
-                "findings": [],
-                "confidence": 0.5,
-                "flags": ["parse-error"],
+        data = safe_parse_json(raw)
+        if data.get("_parse_error"):
+            data = {"summary": raw[:200], "findings": [], "confidence": 0.5, "flags": ["parse-error"],
             }
 
         findings = data.get("findings", [])

@@ -54,6 +54,8 @@ async def download_report(
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("ADR.md", report.get("adr", ""))
         zf.writestr("CONTRIBUTING.md", report.get("contributing", ""))
+        if report.get("setup_walkthrough"):
+            zf.writestr("SETUP.md", report.get("setup_walkthrough", ""))
         for i, issue in enumerate(report.get("first_good_issues", [])[:3], 1):
             content = f"# {issue.get('title', f'Issue {i}')}\n\n{issue.get('description', '')}\n\n## Acceptance Criteria\n"
             content += "\n".join(f"- {c}" for c in issue.get("acceptance_criteria", []))

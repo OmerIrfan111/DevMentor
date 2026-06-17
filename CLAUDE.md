@@ -18,7 +18,7 @@ DevMentor Band democratises senior-level code mentorship. Users submit a GitHub 
 |---|---|
 | Backend | FastAPI, Motor (async MongoDB), python-jose JWT, bcrypt, pydantic-settings |
 | Task queue | Celery + Redis |
-| AI | AWS Bedrock (claude-3-5-sonnet) via BedrockClient |
+| AI | AIML API (deepseek/deepseek-v4-flash) via OpenAI-compatible client |
 | Agent comms | Band SDK (band.create_room, band.post_message, band.get_room_messages) |
 | Frontend | Next.js 14, TypeScript, Tailwind CSS |
 | Infra | Docker Compose, MongoDB Atlas (prod), Upstash Redis (prod) |
@@ -85,7 +85,9 @@ See `backend/.env.example`. Key vars:
 - `JWT_SECRET`, `JWT_ALGORITHM`, `JWT_EXPIRE_MINUTES`
 - `REDIS_URL`
 - `BAND_API_KEY`
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
+- `AIMLAPI_KEY` — AIML API key (https://aimlapi.com)
+- `MODEL_ID` — default `deepseek/deepseek-v4-flash`
+- `GITHUB_TOKEN` — optional, increases GitHub API rate limits
 - `CORS_ORIGINS`
 
 ## Development Phases
@@ -93,9 +95,9 @@ See `backend/.env.example`. Key vars:
 |---|---|---|
 | 1 — Foundation & Auth | 1–2 | ✅ Complete + QA passed |
 | 2 — Band Integration & Agent Core | 3–4 | ✅ Complete |
-| 3 — Full Report UI + Diff Mode | 5–6 | Pending |
-| 4 — Performance, UX Polish & Unique Features | 7 | Pending |
-| 5 — Final Integration QA & Demo Prep | 8 | Pending |
+| 3 — Full Report UI + Diff Mode | 5–6 | ✅ Complete |
+| 4 — Performance, UX Polish & Unique Features | 7 | ✅ Complete |
+| 5 — Final Integration QA & Demo Prep | 8 | ✅ Complete |
 
 ## Phase 2 — Band Integration & Agent Core
 - `band/client.py` — wraps `thenvoi_rest.AsyncRestClient`; `create_room` → `agent_api_chats.create_agent_chat`; `post_message` → `agent_api_events.create_agent_chat_event` (type=`tool_result`, payload in `metadata`); `get_room_messages` → `agent_api_context.get_agent_chat_context`
@@ -108,6 +110,28 @@ See `backend/.env.example`. Key vars:
 - `GET /reports/{session_id}` — returns full report; `GET /reports/{session_id}/download` — ZIP with ADR.md, CONTRIBUTING.md, ISSUE_1-3.md
 - `GET /r/{share_token}` — public read-only (no auth)
 - `frontend/app/analyze/page.tsx` — 4 agent cards with shimmer animation + live Band Room Viewer panel via SSE
+
+## Phase 3 — Full Report UI + Diff Mode
+- `report/[id]/page.tsx` — tabbed report: ADR.md, CONTRIBUTING.md, Setup (walkthrough), Issues, Mentor, Security; sparkline commit activity; download ZIP; copy share link
+- `r/[share_token]/page.tsx` — public read-only shared view, same tabs, no auth, CTA to register
+- `setup_walkthrough` persisted in report doc and included in ZIP as `SETUP.md`
+- `diff_mode` toggle (BETA) on landing form, passed through to POST /analyze
+- Security agent card added to landing page agent explainer grid
+
+## Phase 4 — Performance, UX Polish & Unique Features
+- Repo-analysis cache: same repo+SHA skips pipeline and returns existing session instantly (12h TTL, Redis)
+- Rate limiting: 10 analyses per user per hour (Redis INCR)
+- 30-day commit sparkline on report header (GitHub commits API, public repos)
+- Skeleton shimmer with 500ms min-display guard on report page
+- Human review banner when any agent has `confidence < 0.7`
+- Agent DEBATE displayed in Mentor tab with full markdown rendering
+
+## Phase 5 — Final Integration QA & Demo Prep
+- `qa_phase5.py` — 15 checks: full pipeline integration (Band room, 4 agents, session, report, SSE events, share token) + HTTP layer (invalid URL 422, no auth 401, public share 200/404)
+- All external services mocked (LLM, Band, GitHub, Redis) — no real credentials needed
+- BandClient mock patches: `app.band.client.BandClient`, `app.agents.base.BandClient`, `app.band.session.BandClient`
+- Model ID updated to `deepseek/deepseek-v4-flash` (replacing deprecated `deepseek-chat`)
+- AI provider switched from AWS Bedrock to AIML API (`https://api.aimlapi.com/v1`, OpenAI-compatible)
 
 ## Phase 1 QA Results (all 15 checks passed)
 - `GET /health` → `{status: ok}`

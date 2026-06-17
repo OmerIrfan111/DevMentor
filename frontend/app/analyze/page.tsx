@@ -14,11 +14,11 @@ interface AgentState {
   band_message_id?: string;
 }
 
-const AGENT_META: Record<string, { label: string; tag: string; color: string }> = {
-  security: { label: "Security", tag: "SCAN", color: "#f59e0b" },
-  architect: { label: "Architect", tag: "ADR", color: "#4361ee" },
-  onboarding: { label: "Onboarding", tag: "DOCS", color: "#06b6d4" },
-  mentor: { label: "Mentor", tag: "?→", color: "#a855f7" },
+const AGENT_META: Record<string, { label: string; tag: string; desc: string }> = {
+  security: { label: "Security", tag: "SCAN", desc: "Auditing for vulnerabilities" },
+  architect: { label: "Architect", tag: "ADR", desc: "Mapping architecture decisions" },
+  onboarding: { label: "Onboarding", tag: "DOCS", desc: "Writing CONTRIBUTING.md" },
+  mentor: { label: "Mentor", tag: "SOCRATIC", desc: "Generating Socratic feedback" },
 };
 
 const AGENT_ORDER = ["security", "architect", "onboarding", "mentor"];
@@ -34,6 +34,7 @@ function AnalyzeContent() {
   const router = useRouter();
   const repoUrl = params.get("repo_url") ?? "";
   const githubToken = params.get("github_token") ?? undefined;
+  const diffMode = params.get("diff_mode") === "true";
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [agents, setAgents] = useState<Record<string, AgentState>>({
@@ -66,7 +67,7 @@ function AnalyzeContent() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ repo_url: repoUrl, github_token: githubToken }),
+          body: JSON.stringify({ repo_url: repoUrl, github_token: githubToken, diff_mode: diffMode }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -74,7 +75,6 @@ function AnalyzeContent() {
         }
         const data = await res.json();
 
-        // Cache hit — pipeline already ran for this repo at the same commit
         if (data.status === "completed") {
           router.push(`/report/${data.session_id}`);
           return;
@@ -82,7 +82,6 @@ function AnalyzeContent() {
 
         setSessionId(data.session_id);
 
-        // Open SSE stream
         const es = new EventSource(
           `${BASE_URL}/analyze/stream/${data.session_id}?token=${encodeURIComponent(token)}`
         );
@@ -110,7 +109,7 @@ function AnalyzeContent() {
                   {
                     agent: payload.agent,
                     type: payload.output_type,
-                    content: `${payload.agent.toUpperCase()} completed → ${payload.output_type}`,
+                    content: `${payload.agent.toUpperCase()} → ${payload.output_type}`,
                   },
                 ]);
                 if (bandRef.current) {
@@ -144,164 +143,170 @@ function AnalyzeContent() {
     return () => sseRef.current?.close();
   }, [repoUrl]);
 
-  const activeAgent = AGENT_ORDER.find((a) => agents[a].status === "running") ?? null;
+  const completedCount = AGENT_ORDER.filter((a) => agents[a].status === "complete").length;
 
   return (
     <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;600&display=swap');
-        .analyze-root {
-          min-height: 100vh; background: #0a0a10; color: #dde0f0;
-          font-family: 'DM Sans', sans-serif; padding: 0;
+      <style suppressHydrationWarning>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        .az-root { min-height: 100vh; background: #0a0a0a; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .az-nav {
+          height: 52px; border-bottom: 1px solid #1a1a1a; display: flex; align-items: stretch;
+          position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: #0a0a0a;
         }
-        .analyze-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 18px 32px; border-bottom: 1px solid #1c1c2e;
-          max-width: 1100px; margin: 0 auto;
+        .az-nav-logo {
+          display: flex; align-items: center; padding: 0 24px; border-right: 1px solid #1a1a1a;
+          font-size: 13px; font-weight: 700; color: #ffffff; text-decoration: none;
+          letter-spacing: -0.02em; text-transform: uppercase; flex-shrink: 0;
         }
-        .logo { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; color: #4361ee; text-decoration: none; }
-        .repo-pill {
-          font-family: 'Space Mono', monospace; font-size: 11px; color: #44446a;
-          background: #13131c; border: 1px solid #1c1c2e; border-radius: 100px;
-          padding: 4px 12px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        .az-nav-repo {
+          flex: 1; display: flex; align-items: center; padding: 0 20px;
+          font-size: 11px; color: #333333; overflow: hidden;
+          text-overflow: ellipsis; white-space: nowrap;
         }
-        .analyze-body {
-          max-width: 1100px; margin: 0 auto; padding: 40px 32px;
-          display: grid; grid-template-columns: 1fr 340px; gap: 24px;
+        .az-nav-progress {
+          display: flex; align-items: center; padding: 0 20px; border-left: 1px solid #1a1a1a;
+          font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+          text-transform: uppercase; color: #555555; flex-shrink: 0; gap: 4px;
         }
-        @media (max-width: 768px) { .analyze-body { grid-template-columns: 1fr; } }
-        .agents-col { display: flex; flex-direction: column; gap: 14px; }
-        .agent-card {
-          background: #0e0e17; border: 1px solid #1c1c2e; border-radius: 12px;
-          padding: 20px 22px; display: flex; align-items: center; gap: 16px;
-          transition: border-color 0.3s;
+        .az-nav-progress strong { color: #f5a623; }
+        .az-body {
+          max-width: 1100px; margin: 0 auto; padding: 80px 0 60px;
+          display: grid; grid-template-columns: 1fr 280px; gap: 0;
+          border-left: 1px solid #1a1a1a; border-right: 1px solid #1a1a1a;
         }
-        .agent-card.running { border-color: var(--ac); }
-        .agent-card.complete { border-color: rgba(34,197,94,0.3); }
-        .agent-icon {
-          width: 40px; height: 40px; border-radius: 9px; flex-shrink: 0;
-          display: flex; align-items: center; justify-content: center;
-          font-family: 'Space Mono', monospace; font-size: 9px; font-weight: 700;
-          letter-spacing: 0.03em;
+        @media (max-width: 768px) { .az-body { grid-template-columns: 1fr; } }
+        .az-agents { padding: 40px 32px; border-right: 1px solid #1a1a1a; }
+        .az-headline { font-size: 32px; font-weight: 900; letter-spacing: -0.04em; margin-bottom: 6px; }
+        .az-sub { font-size: 10px; color: #444444; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 40px; }
+        .az-error {
+          border: 1px solid #f5a62340; background: #f5a62308;
+          padding: 12px 16px; font-size: 12px; color: #f5a623; margin-bottom: 24px;
         }
-        .agent-info { flex: 1; }
-        .agent-label { font-size: 14px; font-weight: 600; color: #c8ccee; margin-bottom: 3px; }
-        .agent-sub { font-size: 12px; color: #44446a; font-family: 'Space Mono', monospace; }
-        .status-dot {
-          width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-          background: #2a2a3a;
+        .az-cards { display: flex; flex-direction: column; }
+        .az-card {
+          border: 1px solid #1a1a1a; padding: 24px 20px;
+          display: flex; align-items: center; gap: 20px;
+          transition: border-color 0.3s; background: #0a0a0a;
         }
-        .status-dot.running { background: var(--ac); animation: pulse 1.2s infinite; }
-        .status-dot.complete { background: #22c55e; }
-        .shimmer {
-          height: 3px; border-radius: 2px; background: #1c1c2e; overflow: hidden; margin-top: 10px;
+        .az-card + .az-card { border-top: none; }
+        .az-card.running { border-color: #f5a623; box-shadow: inset 0 0 0 1px #f5a62320; }
+        .az-card.complete { border-color: #2a2a2a; }
+        .az-card-num {
+          font-size: 36px; font-weight: 900; letter-spacing: -0.04em; flex-shrink: 0;
+          color: #1a1a1a; transition: color 0.3s; min-width: 48px; line-height: 1;
         }
-        .shimmer-inner {
+        .az-card.running .az-card-num { color: #f5a623; }
+        .az-card.complete .az-card-num { color: #333333; }
+        .az-card-info { flex: 1; min-width: 0; }
+        .az-card-tag {
+          font-size: 9px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+          color: #333333; margin-bottom: 5px;
+        }
+        .az-card.running .az-card-tag { color: #f5a623; }
+        .az-card.complete .az-card-tag { color: #555555; }
+        .az-card-label { font-size: 18px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 3px; }
+        .az-card-status-text { font-size: 11px; color: #444444; }
+        .az-card.running .az-card-status-text { color: #888888; }
+        .az-card.complete .az-card-status-text { color: #555555; }
+        .az-progress-bar { height: 1px; background: #1a1a1a; margin-top: 12px; overflow: hidden; }
+        .az-progress-inner {
           height: 100%; width: 40%;
-          background: linear-gradient(90deg, transparent, var(--ac), transparent);
-          animation: slide 1.4s infinite;
+          background: linear-gradient(90deg, transparent, #f5a623, transparent);
+          animation: azslide 1.4s infinite;
         }
-        @keyframes slide { 0%{transform:translateX(-150%)} 100%{transform:translateX(350%)} }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-        .band-col { }
-        .band-card {
-          background: #0e0e17; border: 1px solid #1c1c2e; border-radius: 12px;
-          overflow: hidden; position: sticky; top: 20px;
+        .az-indicator { flex-shrink: 0; }
+        .az-dot { width: 8px; height: 8px; background: #1a1a1a; }
+        .az-card.running .az-dot { background: #f5a623; animation: azpulse 1.2s infinite; border-radius: 50%; }
+        .az-card.complete .az-dot { background: #ffffff; }
+        @keyframes azslide { 0%{transform:translateX(-150%)} 100%{transform:translateX(350%)} }
+        @keyframes azpulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        .az-band { padding: 40px 20px; }
+        .az-band-head {
+          font-size: 9px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+          color: #333333; margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
         }
-        .band-header {
-          padding: 14px 16px; border-bottom: 1px solid #1c1c2e;
-          display: flex; align-items: center; gap: 8px;
+        .az-live-dot {
+          width: 6px; height: 6px; background: #f5a623; border-radius: 50%;
+          animation: azpulse 2s infinite; flex-shrink: 0;
         }
-        .band-dot { width: 6px; height: 6px; border-radius: 50%; background: #4361ee; animation: pulse 2s infinite; }
-        .band-title { font-family: 'Space Mono', monospace; font-size: 11px; color: #44446a; letter-spacing: 0.08em; text-transform: uppercase; }
-        .band-messages { padding: 12px; max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-        .band-msg {
-          background: #13131c; border-radius: 7px; padding: 10px 12px;
-          border-left: 2px solid var(--mc, #2a2a3a);
+        .az-band-msgs { display: flex; flex-direction: column; gap: 1px; max-height: 500px; overflow-y: auto; }
+        .az-empty { font-size: 11px; color: #222222; }
+        .az-msg { border: 1px solid #1a1a1a; padding: 10px 12px; }
+        .az-msg-agent {
+          font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+          color: #f5a623; margin-bottom: 3px;
         }
-        .band-msg-agent { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--mc, #44446a); margin-bottom: 3px; text-transform: uppercase; }
-        .band-msg-text { font-size: 12px; color: #6668a0; line-height: 1.5; }
-        .empty-band { padding: 24px; text-align: center; font-family: 'Space Mono', monospace; font-size: 11px; color: #2a2a44; }
-        .error-box {
-          background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2);
-          border-radius: 10px; padding: 16px; margin-bottom: 20px;
-          font-size: 13px; color: #f87171;
-        }
+        .az-msg-text { font-size: 11px; color: #444444; }
       `}</style>
 
-      <div className="analyze-root">
-        <header className="analyze-header">
-          <Link href="/" className="logo">DM/Band</Link>
-          <span className="repo-pill">{repoUrl || "—"}</span>
-        </header>
+      <div className="az-root">
+        <nav className="az-nav">
+          <Link href="/" className="az-nav-logo">DM/Band</Link>
+          <span className="az-nav-repo">{repoUrl || "—"}</span>
+          <div className="az-nav-progress">
+            <strong>{completedCount}</strong>/ 4 agents
+          </div>
+        </nav>
 
-        <div className="analyze-body">
-          <div className="agents-col">
-            {error && <div className="error-box">{error}</div>}
+        <div className="az-body">
+          <div className="az-agents">
+            <h1 className="az-headline">Analysing repo.</h1>
+            <p className="az-sub">4 agents running in sequence via Band · may take 1–2 minutes</p>
 
-            {AGENT_ORDER.map((key) => {
-              const meta = AGENT_META[key];
-              const state = agents[key];
-              const isRunning = state.status === "running";
-              const isDone = state.status === "complete";
+            {error && <div className="az-error">{error}</div>}
 
-              return (
-                <div
-                  key={key}
-                  className={`agent-card ${isRunning ? "running" : isDone ? "complete" : ""}`}
-                  style={{ "--ac": meta.color } as React.CSSProperties}
-                >
+            <div className="az-cards">
+              {AGENT_ORDER.map((key, idx) => {
+                const meta = AGENT_META[key];
+                const state = agents[key];
+                const isRunning = state.status === "running";
+                const isDone = state.status === "complete";
+
+                return (
                   <div
-                    className="agent-icon"
-                    style={{ background: `${meta.color}15`, color: meta.color }}
+                    key={key}
+                    className={`az-card ${isRunning ? "running" : isDone ? "complete" : ""}`}
                   >
-                    {meta.tag}
-                  </div>
-                  <div className="agent-info">
-                    <div className="agent-label">{meta.label}</div>
-                    <div className="agent-sub">
-                      {isRunning ? "Processing…" : isDone ? "Complete" : "Waiting"}
-                    </div>
-                    {isRunning && (
-                      <div className="shimmer">
-                        <div className="shimmer-inner" />
+                    <div className="az-card-num">{String(idx + 1).padStart(2, "0")}</div>
+                    <div className="az-card-info">
+                      <div className="az-card-tag">{meta.tag}</div>
+                      <div className="az-card-label">{meta.label}</div>
+                      <div className="az-card-status-text">
+                        {isRunning ? meta.desc : isDone ? "Complete" : "Waiting"}
                       </div>
-                    )}
+                      {isRunning && (
+                        <div className="az-progress-bar">
+                          <div className="az-progress-inner" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="az-indicator">
+                      <div className="az-dot" />
+                    </div>
                   </div>
-                  <div
-                    className={`status-dot ${isRunning ? "running" : isDone ? "complete" : ""}`}
-                    style={{ "--ac": meta.color } as React.CSSProperties}
-                  />
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
 
-          <div className="band-col">
-            <div className="band-card">
-              <div className="band-header">
-                <span className="band-dot" />
-                <span className="band-title">Band Room</span>
-              </div>
-              <div className="band-messages" ref={bandRef}>
-                {bandMessages.length === 0 ? (
-                  <div className="empty-band">Waiting for agent messages…</div>
-                ) : (
-                  bandMessages.map((msg, i) => {
-                    const color = AGENT_META[msg.agent]?.color ?? "#4361ee";
-                    return (
-                      <div
-                        key={i}
-                        className="band-msg"
-                        style={{ "--mc": color } as React.CSSProperties}
-                      >
-                        <div className="band-msg-agent">{msg.agent} · {msg.type}</div>
-                        <div className="band-msg-text">{msg.content}</div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+          <div className="az-band">
+            <div className="az-band-head">
+              <span className="az-live-dot" />
+              Band Room
+            </div>
+            <div className="az-band-msgs" ref={bandRef}>
+              {bandMessages.length === 0 ? (
+                <div className="az-empty">Waiting for agent messages…</div>
+              ) : (
+                bandMessages.map((msg, i) => (
+                  <div key={i} className="az-msg">
+                    <div className="az-msg-agent">{msg.agent} · {msg.type}</div>
+                    <div className="az-msg-text">{msg.content}</div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -313,8 +318,8 @@ function AnalyzeContent() {
 export default function AnalyzePage() {
   return (
     <Suspense fallback={
-      <div style={{ minHeight: "100vh", background: "#0a0a10", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <span style={{ fontFamily: "monospace", color: "#44446a", fontSize: 13 }}>Loading…</span>
+      <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span style={{ fontFamily: "Inter, sans-serif", color: "#333333", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase" }}>Loading…</span>
       </div>
     }>
       <AnalyzeContent />

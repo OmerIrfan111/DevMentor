@@ -1,5 +1,5 @@
 import json
-from app.agents.base import BaseAgent
+from app.agents.base import BaseAgent, safe_parse_json
 
 SYSTEM_PROMPT = """You are a Socratic programming mentor. Your job is to ask questions, not give answers directly.
 
@@ -61,20 +61,9 @@ Security findings (HIGH severity only):
 
         raw = await self.call_llm(SYSTEM_PROMPT, user_msg, max_tokens=3000)
 
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError:
-            import re
-            m = re.search(r"\{.*\}", raw, re.DOTALL)
-            data = json.loads(m.group()) if m else {
-                "feedback": [{"type": "question", "text": raw[:300]}],
-                "debate": False,
-                "debate_claim": "",
-                "debate_rebuttal": "",
-                "socratic_score": {"questions": 1, "corrections": 0},
-                "confidence": 0.6,
-                "flags": ["parse-error"],
-            }
+        data = safe_parse_json(raw)
+        if data.get("_parse_error"):
+            data = {"feedback": [{"type": "question", "text": raw[:300]}], "debate": False, "debate_claim": "", "debate_rebuttal": "", "socratic_score": {"questions": 1, "corrections": 0}, "confidence": 0.6, "flags": ["parse-error"]}
 
         confidence = float(data.get("confidence", 0.8))
         flags = data.get("flags", [])

@@ -97,6 +97,7 @@ export interface Report {
   band_room_id?: string;
   adr: string;
   contributing: string;
+  setup_walkthrough?: string;
   first_good_issues: FirstGoodIssue[];
   mentor_feedback: MentorFeedback[];
   security_findings: SecurityFinding[];

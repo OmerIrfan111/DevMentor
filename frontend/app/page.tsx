@@ -1,30 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { isAuthenticated, clearAuthToken } from "@/lib/auth";
 
 const AGENTS = [
   {
+    tag: "SCAN",
+    label: "Security",
+    color: "#f5a623",
+    desc: "Hardcoded secrets, injection risks, missing validation, and CORS misconfigurations — severity ranked HIGH / MEDIUM / LOW.",
+    score: "9.2",
+  },
+  {
     tag: "ADR",
     label: "Architect",
-    color: "#4361ee",
-    bg: "rgba(67,97,238,0.08)",
-    body: "Produces an Architectural Decision Record — technology choices, structural patterns, anti-patterns to fix, and known tradeoffs at scale.",
+    color: "#ffffff",
+    desc: "Architectural Decision Record — technology choices, structural patterns, anti-patterns, and tradeoffs at scale.",
+    score: "9.5",
   },
   {
     tag: "DOCS",
     label: "Onboarding",
-    color: "#06b6d4",
-    bg: "rgba(6,182,212,0.08)",
-    body: "Writes your CONTRIBUTING.md, a local setup walkthrough, and three first-good-issues tailored to the exact anti-patterns in your repo.",
+    color: "#ffffff",
+    desc: "CONTRIBUTING.md, local setup walkthrough, and three first-good-issues tailored to your repo's anti-patterns.",
+    score: "9.1",
   },
   {
     tag: "?→",
     label: "Mentor",
-    color: "#a855f7",
-    bg: "rgba(168,85,247,0.08)",
-    body: "Asks Socratic questions instead of correcting. Guides you to understand why patterns matter — not just what to change.",
+    color: "#ffffff",
+    desc: "Socratic questions instead of corrections. Understand why patterns matter — not just what to change.",
+    score: "9.8",
   },
 ];
 
@@ -32,346 +40,497 @@ export default function HomePage() {
   const [repoUrl, setRepoUrl] = useState("");
   const [githubToken, setGithubToken] = useState("");
   const [showToken, setShowToken] = useState(false);
-  const [showTip, setShowTip] = useState(false);
+  const [diffMode, setDiffMode] = useState(false);
+  const [authed, setAuthed] = useState(false);
   const router = useRouter();
+
+  useEffect(() => { setAuthed(isAuthenticated()); }, []);
+
+  const handleSignOut = () => { clearAuthToken(); setAuthed(false); };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!repoUrl.trim()) return;
+    if (!isAuthenticated()) {
+      router.push(`/login?next=${encodeURIComponent("/analyze?" + new URLSearchParams({ repo_url: repoUrl.trim() }).toString())}`);
+      return;
+    }
     const p = new URLSearchParams({ repo_url: repoUrl.trim() });
     if (githubToken.trim()) p.set("github_token", githubToken.trim());
+    if (diffMode) p.set("diff_mode", "true");
     router.push(`/analyze?${p.toString()}`);
   };
 
   return (
     <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap');
+      <style suppressHydrationWarning>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400&display=swap');
 
-        .page-root {
-          font-family: 'DM Sans', sans-serif;
-          background: #0a0a10;
-          color: #dde0f0;
-          min-height: 100vh;
-          overflow-x: hidden;
-          position: relative;
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+          --black: #0a0a0a;
+          --black-2: #111111;
+          --black-3: #1a1a1a;
+          --white: #ffffff;
+          --grey-1: #999999;
+          --grey-2: #555555;
+          --grey-3: #2a2a2a;
+          --orange: #f5a623;
+          --font: 'Inter', -apple-system, sans-serif;
         }
-        .font-mono-brand { font-family: 'Space Mono', monospace; }
 
-        /* Dot grid */
-        .dot-grid {
-          position: fixed; inset: 0; pointer-events: none; z-index: 0;
-          background-image: radial-gradient(circle, rgba(67,97,238,0.18) 1px, transparent 1px);
-          background-size: 28px 28px;
-          opacity: 0.5;
-          mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, black 40%, transparent 100%);
-        }
-        /* Glow orbs */
-        .orb { position: fixed; border-radius: 50%; pointer-events: none; z-index: 0; filter: blur(120px); }
-        .orb-1 { width: 700px; height: 500px; top: -150px; left: 50%; transform: translateX(-50%); background: rgba(67,97,238,0.12); }
-        .orb-2 { width: 400px; height: 400px; top: 40%; right: -100px; background: rgba(120,40,180,0.1); }
-        .orb-3 { width: 350px; height: 350px; bottom: 0; left: -80px; background: rgba(67,97,238,0.07); }
+        html, body { background: var(--black); color: var(--white); }
 
-        /* Header */
-        .header {
-          position: relative; z-index: 10;
+        .root { font-family: var(--font); background: var(--black); min-height: 100vh; }
+
+        /* ── NAV ── */
+        .nav {
+          position: fixed; top: 0; left: 0; right: 0; z-index: 100;
           display: flex; align-items: center; justify-content: space-between;
-          padding: 20px 32px; max-width: 1100px; margin: 0 auto;
+          padding: 0 24px; height: 52px;
+          background: rgba(10,10,10,0.9);
+          border-bottom: 1px solid var(--black-3);
+          backdrop-filter: blur(8px);
         }
-        .logo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
-        .logo-mark {
-          font-family: 'Space Mono', monospace;
-          font-weight: 700; font-size: 15px; color: #4361ee;
-          border: 1px solid rgba(67,97,238,0.4); border-radius: 6px;
-          padding: 2px 7px;
+        .nav-left { display: flex; align-items: center; gap: 24px; }
+        .logo {
+          font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
+          color: var(--white); text-decoration: none; text-transform: uppercase;
         }
-        .logo-sub {
-          font-family: 'Space Mono', monospace;
-          font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: #55567a;
+        .logo span { color: var(--orange); }
+        .nav-tag {
+          font-size: 9px; font-weight: 600; letter-spacing: 0.1em;
+          text-transform: uppercase; color: var(--grey-2);
+          border: 1px solid var(--grey-3); border-radius: 2px; padding: 2px 6px;
         }
-        .nav { display: flex; align-items: center; gap: 12px; }
+        .nav-right { display: flex; align-items: center; gap: 0; }
         .nav-link {
-          font-size: 13px; color: #55567a; text-decoration: none;
-          transition: color 0.2s;
-        }
-        .nav-link:hover { color: #dde0f0; }
-        .nav-btn {
-          font-size: 13px; padding: 7px 16px; border-radius: 7px;
-          border: 1px solid rgba(67,97,238,0.35); color: #4361ee;
-          text-decoration: none; background: transparent;
-          transition: background 0.2s, border-color 0.2s;
-        }
-        .nav-btn:hover { background: rgba(67,97,238,0.1); border-color: rgba(67,97,238,0.6); }
-
-        /* Hero */
-        .hero {
-          position: relative; z-index: 10;
-          display: flex; flex-direction: column; align-items: center;
-          padding: 80px 24px 100px; text-align: center;
-        }
-        .badge {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 6px 14px; border-radius: 100px;
-          border: 1px solid rgba(67,97,238,0.25); background: rgba(67,97,238,0.06);
-          margin-bottom: 36px;
-        }
-        .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: #4361ee; animation: pulse 2s infinite; }
-        .badge-text {
-          font-family: 'Space Mono', monospace; font-size: 10px;
-          color: #55567a; letter-spacing: 0.1em; text-transform: uppercase;
-        }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-        .hero-h1 {
-          font-family: 'Space Mono', monospace;
-          font-size: clamp(36px, 7vw, 76px);
-          line-height: 1.06; font-weight: 700;
-          letter-spacing: -0.02em; margin-bottom: 8px;
-          max-width: 820px;
-        }
-        .h1-accent { color: #4361ee; }
-        .h1-muted {
-          display: block; font-size: 0.62em;
-          color: #393a5a; font-weight: 400; margin-top: 6px;
-          letter-spacing: 0;
-        }
-
-        .hero-sub {
-          max-width: 580px; margin: 24px auto 48px;
-          font-size: 15px; color: #6668a0; line-height: 1.7;
-        }
-        .hero-sub code {
-          font-family: 'Space Mono', monospace;
-          font-size: 12px; color: #4361ee;
-          background: rgba(67,97,238,0.1); padding: 1px 5px; border-radius: 4px;
-        }
-        .hero-sub strong { color: #c8ccee; }
-
-        /* Form */
-        .form { width: 100%; max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
-        .input-row {
+          font-size: 11px; font-weight: 500; letter-spacing: 0.04em;
+          text-transform: uppercase; color: var(--grey-1);
+          text-decoration: none; padding: 0 16px; height: 52px;
           display: flex; align-items: center;
-          background: #13131c; border: 1px solid #22223a;
-          border-radius: 10px; overflow: hidden;
-          transition: border-color 0.2s;
+          border-left: 1px solid var(--black-3);
+          transition: color 0.15s, background 0.15s;
         }
-        .input-row:focus-within { border-color: rgba(67,97,238,0.5); }
-        .input-prefix {
-          padding: 0 14px; font-family: 'Space Mono', monospace;
-          font-size: 13px; color: #4361ee;
-          border-right: 1px solid #22223a; white-space: nowrap;
-          line-height: 50px;
+        .nav-link:hover { color: var(--white); background: var(--black-2); }
+        .nav-link-cta {
+          font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+          text-transform: uppercase; color: var(--black);
+          background: var(--white); text-decoration: none;
+          padding: 0 20px; height: 52px; display: flex; align-items: center;
+          border-left: 1px solid var(--black-3);
+          transition: background 0.15s;
         }
-        .url-input {
-          flex: 1; background: transparent; border: none; outline: none;
-          padding: 0 16px; font-family: 'Space Mono', monospace;
-          font-size: 13px; color: #dde0f0; height: 50px;
-        }
-        .url-input::placeholder { color: #2a2a44; }
-        .token-row { display: flex; align-items: center; gap: 8px; }
-        .token-toggle {
-          background: none; border: none; cursor: pointer;
-          font-family: 'Space Mono', monospace; font-size: 11px; color: #393a5a;
-          transition: color 0.2s; padding: 0;
-        }
-        .token-toggle:hover { color: #6668a0; }
-        .tip-wrap { position: relative; }
-        .tip-btn {
-          background: none; border: none; cursor: pointer;
-          font-size: 12px; color: #2a2a44; transition: color 0.2s; padding: 0; line-height: 1;
-        }
-        .tip-btn:hover { color: #55567a; }
-        .tooltip {
-          position: absolute; bottom: calc(100% + 8px); left: 0;
-          width: 220px; background: #13131c; border: 1px solid #22223a;
-          border-radius: 7px; padding: 9px 12px;
-          font-size: 12px; color: #6668a0; z-index: 30;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.5); pointer-events: none;
-        }
-        .token-input {
-          background: #13131c; border: 1px solid #22223a; border-radius: 10px;
-          padding: 13px 16px; font-family: 'Space Mono', monospace;
-          font-size: 12px; color: #dde0f0; outline: none; width: 100%;
-          transition: border-color 0.2s;
-        }
-        .token-input::placeholder { color: #2a2a44; }
-        .token-input:focus { border-color: rgba(67,97,238,0.45); }
-        .cta-btn {
-          width: 100%; padding: 15px; border-radius: 10px;
-          background: #4361ee; color: #fff; border: none; cursor: pointer;
-          font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 14px;
-          letter-spacing: 0.01em;
-          box-shadow: 0 4px 32px rgba(67,97,238,0.25);
-          transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
-        }
-        .cta-btn:hover { background: #3751d4; box-shadow: 0 6px 40px rgba(67,97,238,0.4); }
-        .cta-btn:active { transform: scale(0.985); }
+        .nav-link-cta:hover { background: #e0e0e0; }
 
-        /* Agent cards */
-        .agents-section {
-          position: relative; z-index: 10;
-          max-width: 1060px; margin: 0 auto; padding: 0 24px 100px;
+        /* ── HERO ── */
+        .hero {
+          padding-top: 52px; /* nav offset */
+          min-height: 100vh;
+          display: grid;
+          grid-template-rows: 1fr auto;
+          border-bottom: 1px solid var(--black-3);
         }
-        .agents-label {
-          text-align: center; margin-bottom: 40px;
-          font-family: 'Space Mono', monospace; font-size: 10px;
-          letter-spacing: 0.15em; text-transform: uppercase; color: #2a2a44;
+        .hero-top {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          border-bottom: 1px solid var(--black-3);
         }
-        .agents-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+        .hero-left {
+          padding: 64px 56px;
+          border-right: 1px solid var(--black-3);
+          display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .hero-eyebrow {
+          font-size: 9px; font-weight: 600; letter-spacing: 0.14em;
+          text-transform: uppercase; color: var(--grey-2);
+          margin-bottom: 40px;
+        }
+        .hero-h1 {
+          font-size: clamp(48px, 6.5vw, 96px);
+          font-weight: 900; line-height: 0.95;
+          letter-spacing: -0.04em;
+          color: var(--white);
+        }
+        .hero-h1 em {
+          font-style: italic; font-weight: 300;
+          color: var(--grey-1);
+        }
+        .hero-meta {
+          margin-top: 48px;
+          display: flex; align-items: center; gap: 32px;
+        }
+        .hero-meta-item { }
+        .hero-meta-value {
+          font-size: 28px; font-weight: 800; letter-spacing: -0.04em; color: var(--white);
+          display: block;
+        }
+        .hero-meta-label {
+          font-size: 9px; font-weight: 500; letter-spacing: 0.1em;
+          text-transform: uppercase; color: var(--grey-2);
+          margin-top: 2px; display: block;
+        }
+        .hero-meta-divider { width: 1px; height: 40px; background: var(--black-3); }
+
+        .hero-right {
+          padding: 64px 56px;
+          display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .hero-desc {
+          font-size: 15px; font-weight: 400; line-height: 1.7;
+          color: var(--grey-1); max-width: 400px; margin-bottom: 48px;
+        }
+
+        /* ── FORM ── */
+        .form { display: flex; flex-direction: column; gap: 0; }
+        .form-field {
+          border: 1px solid var(--black-3); background: var(--black-2);
+          transition: border-color 0.15s;
+        }
+        .form-field:focus-within { border-color: var(--grey-2); }
+        .form-field + .form-field { margin-top: -1px; }
+        .form-field-label {
+          display: block; padding: 10px 16px 0;
+          font-size: 8px; font-weight: 700; letter-spacing: 0.12em;
+          text-transform: uppercase; color: var(--grey-2);
+        }
+        .form-input {
+          display: block; width: 100%; background: transparent; border: none;
+          outline: none; padding: 6px 16px 12px;
+          font-family: var(--font); font-size: 13px;
+          color: var(--white);
+        }
+        .form-input::placeholder { color: var(--grey-3); }
+        .form-input[type="password"] { letter-spacing: 0.05em; }
+        .form-options {
+          display: flex; align-items: center; gap: 0;
+          border: 1px solid var(--black-3); border-top: none;
+          background: var(--black-2);
+        }
+        .token-btn {
+          flex: 1; background: none; border: none; border-right: 1px solid var(--black-3);
+          padding: 12px 16px; cursor: pointer;
+          font-family: var(--font); font-size: 10px; font-weight: 600;
+          letter-spacing: 0.08em; text-transform: uppercase;
+          color: var(--grey-2); text-align: left;
+          transition: color 0.15s;
+        }
+        .token-btn:hover { color: var(--white); }
+        .diff-wrap {
+          display: flex; align-items: center; gap: 10px;
+          padding: 12px 16px;
+        }
+        .toggle {
+          position: relative; width: 32px; height: 16px; flex-shrink: 0; cursor: pointer;
+        }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-track {
+          position: absolute; inset: 0; border-radius: 16px;
+          background: var(--black-3); transition: background 0.2s;
+          border: 1px solid var(--grey-3);
+        }
+        .toggle-thumb {
+          position: absolute; width: 10px; height: 10px; border-radius: 50%;
+          top: 2px; left: 2px; background: var(--grey-2);
+          transition: transform 0.2s, background 0.2s;
+        }
+        .toggle input:checked ~ .toggle-track { background: var(--white); border-color: var(--white); }
+        .toggle input:checked ~ .toggle-thumb { transform: translateX(16px); background: var(--black); }
+        .diff-label {
+          font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+          text-transform: uppercase; color: var(--grey-2); cursor: pointer; user-select: none;
+        }
+        .beta { font-size: 8px; color: var(--orange); border: 1px solid rgba(245,166,35,0.3); border-radius: 2px; padding: 1px 5px; letter-spacing: 0.08em; }
+        .submit-btn {
+          width: 100%; padding: 18px; border: none; cursor: pointer;
+          font-family: var(--font); font-size: 11px; font-weight: 800;
+          letter-spacing: 0.12em; text-transform: uppercase;
+          background: var(--white); color: var(--black);
+          transition: background 0.15s;
+          margin-top: 2px;
+        }
+        .submit-btn:hover { background: #e0e0e0; }
+
+        /* ── HERO BOTTOM TICKER ── */
+        .hero-bottom {
+          display: flex; align-items: center; overflow: hidden; height: 44px;
+        }
+        .ticker-label {
+          padding: 0 24px; height: 44px; display: flex; align-items: center;
+          font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+          text-transform: uppercase; color: var(--black); background: var(--white);
+          white-space: nowrap; border-right: 1px solid var(--black-3); flex-shrink: 0;
+        }
+        .ticker-track {
+          flex: 1; overflow: hidden;
+          font-size: 11px; font-weight: 500; letter-spacing: 0.06em;
+          text-transform: uppercase; color: var(--grey-2);
+          display: flex; align-items: center; gap: 48px;
+          white-space: nowrap; animation: ticker 30s linear infinite;
+          padding-left: 32px;
+        }
+        @keyframes ticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+        .ticker-dot { color: var(--orange); flex-shrink: 0; }
+
+        /* ── AGENTS SECTION ── */
+        .section-header {
+          display: flex; align-items: baseline; justify-content: space-between;
+          padding: 32px 24px;
+          border-bottom: 1px solid var(--black-3);
+        }
+        .section-title {
+          font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
+          text-transform: uppercase; color: var(--grey-2);
+        }
+        .section-count {
+          font-size: 9px; font-weight: 500; letter-spacing: 0.06em;
+          color: var(--grey-2);
+        }
+        .agents-grid {
+          display: grid; grid-template-columns: repeat(4, 1fr);
+        }
         .agent-card {
-          background: #0e0e17; border: 1px solid #1c1c2e;
-          border-radius: 14px; padding: 24px;
-          transition: border-color 0.25s, transform 0.2s;
+          border-right: 1px solid var(--black-3);
+          border-bottom: 1px solid var(--black-3);
+          transition: background 0.2s;
           cursor: default;
         }
-        .agent-card:hover { border-color: var(--card-color); transform: translateY(-2px); }
-        .agent-icon {
-          width: 36px; height: 36px; border-radius: 8px;
-          display: flex; align-items: center; justify-content: center;
-          margin-bottom: 16px;
-          font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700;
-          letter-spacing: 0.05em;
+        .agent-card:last-child { border-right: none; }
+        .agent-card:hover { background: var(--black-2); }
+        .agent-card-top {
+          padding: 28px 24px 20px;
+          border-bottom: 1px solid var(--black-3);
+          display: flex; align-items: flex-start; justify-content: space-between;
         }
+        .agent-tag-pill {
+          font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+          text-transform: uppercase; color: var(--black);
+          background: var(--white); padding: 4px 8px; border-radius: 2px;
+        }
+        .agent-score {
+          text-align: right;
+        }
+        .agent-score-val {
+          font-size: 22px; font-weight: 900; letter-spacing: -0.04em;
+          color: var(--white); line-height: 1; display: block;
+        }
+        .agent-score-label {
+          font-size: 8px; font-weight: 500; letter-spacing: 0.08em;
+          text-transform: uppercase; color: var(--grey-2); display: block; margin-top: 2px;
+        }
+        .agent-card-body { padding: 20px 24px 28px; }
         .agent-name {
-          font-size: 15px; font-weight: 600; color: #c8ccee; margin-bottom: 8px;
+          font-size: 15px; font-weight: 700; letter-spacing: -0.02em;
+          color: var(--white); margin-bottom: 12px;
         }
-        .agent-body { font-size: 13px; color: #44446a; line-height: 1.65; }
-        .agent-body code {
-          font-family: 'Space Mono', monospace; font-size: 11px;
-          background: rgba(67,97,238,0.1); color: #4361ee;
-          padding: 1px 4px; border-radius: 3px;
-        }
+        .agent-desc { font-size: 12px; line-height: 1.7; color: var(--grey-2); }
 
-        /* Footer divider */
-        .divider { max-width: 1060px; margin: 0 auto; height: 1px; background: #1c1c2e; }
+        /* ── FOOTER ── */
+        .footer {
+          border-top: 1px solid var(--black-3);
+          display: grid; grid-template-columns: 1fr 1fr;
+        }
+        .footer-left {
+          padding: 40px 24px; border-right: 1px solid var(--black-3);
+          display: flex; flex-direction: column; justify-content: space-between; gap: 32px;
+        }
+        .footer-logo { font-size: 20px; font-weight: 900; letter-spacing: -0.03em; color: var(--white); }
+        .footer-logo span { color: var(--orange); }
+        .footer-copy { font-size: 10px; color: var(--grey-2); letter-spacing: 0.04em; }
+        .footer-right {
+          padding: 40px 24px;
+          display: flex; align-items: center; justify-content: flex-end; gap: 32px;
+        }
+        .footer-link {
+          font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+          text-transform: uppercase; color: var(--grey-2); text-decoration: none;
+          transition: color 0.15s;
+        }
+        .footer-link:hover { color: var(--white); }
+
+        @media (max-width: 768px) {
+          .hero-top { grid-template-columns: 1fr; }
+          .hero-left { border-right: none; padding: 40px 24px; }
+          .hero-right { padding: 40px 24px; }
+          .agents-grid { grid-template-columns: 1fr 1fr; }
+          .agent-card:nth-child(2) { border-right: none; }
+          .footer { grid-template-columns: 1fr; }
+          .footer-left { border-right: none; }
+        }
+        @media (max-width: 480px) {
+          .agents-grid { grid-template-columns: 1fr; }
+          .agent-card { border-right: none; }
+        }
       `}</style>
 
-      <div className="page-root">
-        <div className="dot-grid" aria-hidden />
-        <div className="orb orb-1" aria-hidden />
-        <div className="orb orb-2" aria-hidden />
-        <div className="orb orb-3" aria-hidden />
-
-        {/* Header */}
-        <header className="header">
-          <Link href="/" className="logo">
-            <span className="logo-mark">DM/</span>
-            <span className="logo-sub">Band</span>
-          </Link>
-          <nav className="nav">
-            <Link href="/login" className="nav-link">Login</Link>
-            <Link href="/register" className="nav-btn">Register</Link>
-          </nav>
-        </header>
+      <div className="root">
+        {/* Nav */}
+        <nav className="nav">
+          <div className="nav-left">
+            <Link href="/" className="logo">Dev<span>Mentor</span></Link>
+            <span className="nav-tag">Band</span>
+          </div>
+          <div className="nav-right">
+            {authed ? (
+              <>
+                <Link href="/analyze" className="nav-link">Analyse</Link>
+                <button onClick={handleSignOut} className="nav-link" style={{ background: "none", border: "none", cursor: "pointer", borderLeft: "1px solid var(--black-3)" }}>Sign out</button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="nav-link">Sign in</Link>
+                <Link href="/register" className="nav-link-cta">Get started</Link>
+              </>
+            )}
+          </div>
+        </nav>
 
         {/* Hero */}
         <section className="hero">
-          <div className="badge">
-            <span className="badge-dot" />
-            <span className="badge-text">Band of Agents Hackathon 2026</span>
-          </div>
-
-          <h1 className="hero-h1">
-            Your <span className="h1-accent">AI Senior</span>
-            <br />Dev Team.
-            <span className="h1-muted">No gatekeeping.</span>
-          </h1>
-
-          <p className="hero-sub">
-            Submit a GitHub repo. Four AI agents collaborate to give you architectural feedback,
-            a <code>CONTRIBUTING.md</code>, and Socratic mentorship —{" "}
-            <strong>in under 90 seconds.</strong>
-          </p>
-
-          <form className="form" onSubmit={handleSubmit}>
-            <div className="input-row">
-              <span className="input-prefix">$ url</span>
-              <input
-                className="url-input"
-                type="url"
-                value={repoUrl}
-                onChange={(e) => setRepoUrl(e.target.value)}
-                placeholder="https://github.com/username/repo"
-                required
-                autoComplete="off"
-              />
+          <div className="hero-top">
+            <div className="hero-left">
+              <div>
+                <p className="hero-eyebrow">Multi-agent code mentorship · Hackathon 2026</p>
+                <h1 className="hero-h1">
+                  The AI<br />
+                  your code<br />
+                  <em>deserves</em>
+                </h1>
+              </div>
+              <div className="hero-meta">
+                <div className="hero-meta-item">
+                  <span className="hero-meta-value">4</span>
+                  <span className="hero-meta-label">AI agents</span>
+                </div>
+                <div className="hero-meta-divider" />
+                <div className="hero-meta-item">
+                  <span className="hero-meta-value">90s</span>
+                  <span className="hero-meta-label">Avg runtime</span>
+                </div>
+                <div className="hero-meta-divider" />
+                <div className="hero-meta-item">
+                  <span className="hero-meta-value">∞</span>
+                  <span className="hero-meta-label">Repos</span>
+                </div>
+              </div>
             </div>
 
-            <div className="token-row">
-              <button
-                type="button"
-                className="token-toggle"
-                onClick={() => setShowToken((v) => !v)}
-              >
-                {showToken ? "▼" : "▶"} github token (optional)
-              </button>
-              <div className="tip-wrap">
-                <button
-                  type="button"
-                  className="tip-btn"
-                  onMouseEnter={() => setShowTip(true)}
-                  onMouseLeave={() => setShowTip(false)}
-                  aria-label="Token info"
-                >
-                  ⓘ
-                </button>
-                {showTip && (
-                  <div className="tooltip">
-                    Increases rate limits for private/large repos
+            <div className="hero-right">
+              <p className="hero-desc">
+                Paste a GitHub repo URL. Four specialized AI agents collaborate to produce
+                security findings, an ADR, onboarding docs, and Socratic mentorship — all in one run.
+              </p>
+
+              <form className="form" onSubmit={handleSubmit}>
+                <div className="form-field">
+                  <label className="form-field-label" htmlFor="repo-url">Repository URL</label>
+                  <input
+                    id="repo-url"
+                    className="form-input"
+                    type="url"
+                    value={repoUrl}
+                    onChange={(e) => setRepoUrl(e.target.value)}
+                    placeholder="https://github.com/username/repo"
+                    required
+                    autoComplete="off"
+                  />
+                </div>
+
+                {showToken && (
+                  <div className="form-field">
+                    <label className="form-field-label">GitHub Token</label>
+                    <input
+                      className="form-input"
+                      type="password"
+                      value={githubToken}
+                      onChange={(e) => setGithubToken(e.target.value)}
+                      placeholder="ghp_••••••••••••••••"
+                      autoComplete="off"
+                    />
                   </div>
                 )}
-              </div>
-            </div>
 
-            {showToken && (
-              <input
-                className="token-input"
-                type="password"
-                value={githubToken}
-                onChange={(e) => setGithubToken(e.target.value)}
-                placeholder="ghp_••••••••••••••••••••••••••••••••••••••"
-                autoComplete="off"
-              />
-            )}
-
-            <button type="submit" className="cta-btn">
-              Analyse with AI →
-            </button>
-          </form>
-        </section>
-
-        {/* Agent explainer */}
-        <section className="agents-section">
-          <p className="agents-label">Four agents. One band.</p>
-          <div className="agents-grid">
-            {AGENTS.map((a) => (
-              <div
-                key={a.label}
-                className="agent-card"
-                style={{ "--card-color": a.color } as React.CSSProperties}
-              >
-                <div
-                  className="agent-icon"
-                  style={{ background: a.bg, color: a.color }}
-                >
-                  {a.tag}
+                <div className="form-options">
+                  <button type="button" className="token-btn" onClick={() => setShowToken(v => !v)}>
+                    {showToken ? "− Remove" : "+ Add"} GitHub token
+                  </button>
+                  <div className="diff-wrap">
+                    <label className="toggle">
+                      <input type="checkbox" checked={diffMode} onChange={e => setDiffMode(e.target.checked)} />
+                      <span className="toggle-track" />
+                      <span className="toggle-thumb" />
+                    </label>
+                    <span className="diff-label" onClick={() => setDiffMode(v => !v)}>Diff</span>
+                    <span className="beta">BETA</span>
+                  </div>
                 </div>
-                <div className="agent-name">{a.label}</div>
-                <p
-                  className="agent-body"
-                  dangerouslySetInnerHTML={{
-                    __html: a.body.replace(
-                      /CONTRIBUTING\.md/g,
-                      '<code>CONTRIBUTING.md</code>'
-                    ),
-                  }}
-                />
-              </div>
-            ))}
+
+                <button type="submit" className="submit-btn">
+                  Analyse now →
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Ticker */}
+          <div className="hero-bottom">
+            <span className="ticker-label">Live pipeline</span>
+            <div className="ticker-track">
+              {[...Array(2)].map((_, i) => (
+                <span key={i} style={{ display: "contents" }}>
+                  <span>Security scan</span>
+                  <span className="ticker-dot">·</span>
+                  <span>Architecture ADR</span>
+                  <span className="ticker-dot">·</span>
+                  <span>Onboarding docs</span>
+                  <span className="ticker-dot">·</span>
+                  <span>Socratic mentor</span>
+                  <span className="ticker-dot">·</span>
+                  <span>Band agents</span>
+                  <span className="ticker-dot">·</span>
+                  <span>DeepSeek AI</span>
+                  <span className="ticker-dot">·</span>
+                </span>
+              ))}
+            </div>
           </div>
         </section>
 
-        <div className="divider" />
+        {/* Agents */}
+        <div className="section-header">
+          <span className="section-title">Agent pipeline</span>
+          <span className="section-count">04 agents</span>
+        </div>
+        <div className="agents-grid">
+          {AGENTS.map((a) => (
+            <div key={a.label} className="agent-card">
+              <div className="agent-card-top">
+                <span className="agent-tag-pill">{a.tag}</span>
+                <div className="agent-score">
+                  <span className="agent-score-val">{a.score}</span>
+                  <span className="agent-score-label">Score</span>
+                </div>
+              </div>
+              <div className="agent-card-body">
+                <div className="agent-name">{a.label} Agent</div>
+                <p className="agent-desc">{a.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <footer className="footer">
+          <div className="footer-left">
+            <div className="footer-logo">Dev<span>Mentor</span></div>
+            <span className="footer-copy">© 2026 DevMentor Band · Band of Agents Hackathon</span>
+          </div>
+          <div className="footer-right">
+            <Link href="/login" className="footer-link">Sign in</Link>
+            <Link href="/register" className="footer-link">Register</Link>
+          </div>
+        </footer>
       </div>
     </>
   );

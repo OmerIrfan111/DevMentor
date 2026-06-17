@@ -1,7 +1,8 @@
 import httpx
+import json
 import re
 from abc import ABC, abstractmethod
-from anthropic import AsyncAnthropicBedrock
+from openai import AsyncOpenAI
 from app.band.client import BandClient
 from app.config import settings
 
@@ -36,6 +37,13 @@ async def fetch_repo_contents(repo_url: str, github_token: str | None = None) ->
         repo_resp = await client.get(
             f"https://api.github.com/repos/{owner}/{repo}", headers=headers
         )
+        if repo_resp.status_code == 403:
+            raise RuntimeError(
+                "GitHub API rate limit exceeded. Set GITHUB_TOKEN in your environment "
+                "to raise the limit from 60 to 5000 requests/hour."
+            )
+        if repo_resp.status_code == 404:
+            raise RuntimeError(f"GitHub repo not found: {owner}/{repo}")
         repo_resp.raise_for_status()
         default_branch = repo_resp.json().get("default_branch", "main")
 
@@ -45,6 +53,11 @@ async def fetch_repo_contents(repo_url: str, github_token: str | None = None) ->
             headers=headers,
             params={"recursive": "1"},
         )
+        if tree_resp.status_code == 403:
+            raise RuntimeError(
+                "GitHub API rate limit exceeded. Set GITHUB_TOKEN in your environment "
+                "to raise the limit from 60 to 5000 requests/hour."
+            )
         tree_resp.raise_for_status()
         tree = tree_resp.json().get("tree", [])
 
@@ -89,12 +102,41 @@ async def fetch_repo_contents(repo_url: str, github_token: str | None = None) ->
         }
 
 
-def _llm_client() -> AsyncAnthropicBedrock:
-    return AsyncAnthropicBedrock(
-        aws_access_key=settings.aws_access_key_id,
-        aws_secret_key=settings.aws_secret_access_key,
-        aws_region=settings.aws_region,
+def _llm_client() -> AsyncOpenAI:
+    return AsyncOpenAI(
+        api_key=settings.aimlapi_key,
+        base_url="https://api.aimlapi.com/v1",
     )
+
+
+def safe_parse_json(raw: str) -> dict:
+    """Robustly extract JSON from an LLM response that may be malformed."""
+    import re as _re
+
+    # 1. Try direct parse
+    try:
+        return json.loads(raw)
+    except Exception:
+        pass
+
+    # 2. Strip markdown code fences
+    stripped = _re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=_re.MULTILINE).strip()
+    try:
+        return json.loads(stripped)
+    except Exception:
+        pass
+
+    # 3. Find the outermost { ... } block
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        try:
+            return json.loads(stripped[start : end + 1])
+        except Exception:
+            pass
+
+    # 4. Give up — return raw as a string field so the pipeline doesn't crash
+    return {"_raw": raw, "_parse_error": True}
 
 
 class BaseAgent(ABC):
@@ -129,13 +171,15 @@ class BaseAgent(ABC):
         return await self.band.post_message(self.room_id, payload)
 
     async def call_llm(self, system: str, user: str, max_tokens: int = 4096) -> str:
-        response = await self._llm.messages.create(
-            model=settings.bedrock_model_id,
+        response = await self._llm.chat.completions.create(
+            model=settings.model_id,
             max_tokens=max_tokens,
-            system=system,
-            messages=[{"role": "user", "content": user}],
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
         )
-        return response.content[0].text
+        return response.choices[0].message.content
 
     @abstractmethod
     async def run(self, repo: dict, github_token: str | None = None) -> dict:

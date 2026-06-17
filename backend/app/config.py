@@ -9,11 +9,9 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60
     redis_url: str = "redis://localhost:6379"
     band_api_key: str = ""
-    aws_access_key_id: str = ""
-    aws_secret_access_key: str = ""
-    aws_region: str = "us-east-1"
+    aimlapi_key: str = ""
+    model_id: str = "deepseek-chat"
     github_token: str = ""
-    bedrock_model_id: str = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
     cors_origins: str = "http://localhost:3000"
 
     @property

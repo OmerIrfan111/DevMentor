@@ -9,5 +9,5 @@ celery==5.4.0
 redis==8.0.0
 httpx==0.28.1
 python-multipart==0.0.12
-anthropic==0.109.1
+openai>=1.54.0
 band-sdk==1.0.0

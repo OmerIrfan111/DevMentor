@@ -111,6 +111,7 @@ async def run_pipeline(
             "band_room_id": band_room_id,
             "adr": architect_r.get("adr", ""),
             "contributing": onboarding_r.get("contributing", ""),
+            "setup_walkthrough": onboarding_r.get("setup_walkthrough", ""),
             "first_good_issues": onboarding_r.get("first_good_issues", []),
             "mentor_feedback": mentor_r.get("feedback", []),
             "security_findings": security_r.get("findings", []),
@@ -160,6 +161,8 @@ async def run_pipeline(
         })
 
     except Exception as exc:
+        import traceback as _tb
+        _tb.print_exc()
         await db.sessions.update_one(
             {"session_id": session_id},
             {"$set": {"status": "failed", "error": str(exc)}},
