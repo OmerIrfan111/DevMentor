@@ -1,6 +1,7 @@
 # Backend
 .env
 backend/.env
+backend/dev_server.py
 backend/__pycache__/
 backend/**/__pycache__/
 backend/*.egg-info/
