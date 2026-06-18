@@ -2,8 +2,6 @@
 
 > AI-powered code mentorship — submit a GitHub repo, get a full senior-level engineering review in seconds.
 
-Built for the **Band of Agents Hackathon 2026** · Tracks 1 & 2
-
 ---
 
 ## What It Does
